@@ -88,21 +88,120 @@ function getMappingValue(
   return undefined;
 }
 
-// Parse unavailability from a string (e.g., "Day 1: 9:00, 10:00; Day 2: 11:00")
+// Parse time with flexible format: "9:00", "9:00a", "9:00 AM", "14:00", "2:45p", etc.
+function parseTimeString(timeStr: string): string | undefined {
+  if (!timeStr) return undefined;
+
+  const cleaned = timeStr.trim().toLowerCase();
+
+  // Check for 'a' or 'p' suffix (e.g., "2:45p", "9a", "10:30a")
+  const suffixMatch = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])m?$/i);
+  if (suffixMatch) {
+    let hours = parseInt(suffixMatch[1], 10);
+    const mins = suffixMatch[2] ? parseInt(suffixMatch[2], 10) : 0;
+    const isPM = suffixMatch[3].toLowerCase() === 'p';
+
+    if (isPM && hours < 12) hours += 12;
+    if (!isPM && hours === 12) hours = 0;
+
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
+  // Check for full AM/PM format (e.g., "9:00 AM", "2:30 PM")
+  const fullMatch = cleaned.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (fullMatch) {
+    let hours = parseInt(fullMatch[1], 10);
+    const mins = parseInt(fullMatch[2], 10);
+    const isPM = fullMatch[3].toLowerCase() === 'pm';
+
+    if (isPM && hours < 12) hours += 12;
+    if (!isPM && hours === 12) hours = 0;
+
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
+  // Check for 24-hour format (e.g., "14:00", "9:00")
+  const militaryMatch = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (militaryMatch) {
+    const hours = parseInt(militaryMatch[1], 10);
+    const mins = parseInt(militaryMatch[2], 10);
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
+  return undefined;
+}
+
+// Month abbreviations mapping
+const monthMap: Record<string, number> = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11,
+};
+
+// Day of week mapping
+const dayOfWeekMap: Record<string, string> = {
+  sunday: 'Sunday', sun: 'Sunday',
+  monday: 'Monday', mon: 'Monday',
+  tuesday: 'Tuesday', tue: 'Tuesday', tues: 'Tuesday',
+  wednesday: 'Wednesday', wed: 'Wednesday',
+  thursday: 'Thursday', thu: 'Thursday', thur: 'Thursday', thurs: 'Thursday',
+  friday: 'Friday', fri: 'Friday',
+  saturday: 'Saturday', sat: 'Saturday',
+};
+
+// Parse unavailability from a string with multiple formats:
+// - "Day 1: 9:00, 10:00; Day 2: 11:00"
+// - "I will not be able to teach Wednesday, Jan 15"
+// - "I will not be able to teach Thursday, January 16"
 function parseUnavailability(value: string | undefined): UnavailabilitySlot[] {
   if (!value) return [];
 
   const slots: UnavailabilitySlot[] = [];
-  // Try parsing format: "Day 1: 9:00, 10:00; Day 2: 11:00"
+
+  // Pattern 1: "I will not be able to teach WEEKDAY, MONTH DAY"
+  // Examples: "I will not be able to teach Wednesday, Jan 15"
+  //           "I will not be able to teach Thursday, January 16"
+  const teachPattern = /i will not be able to teach\s+(\w+),?\s*(\w+)\.?\s*(\d+)/gi;
+  let teachMatch;
+  while ((teachMatch = teachPattern.exec(value)) !== null) {
+    const weekday = teachMatch[1].toLowerCase();
+    const monthStr = teachMatch[2].toLowerCase();
+    // dayNum (teachMatch[3]) is captured but not used - we only need the weekday for scheduling
+
+    // Try to parse as weekday + month day
+    if (dayOfWeekMap[weekday] && monthMap[monthStr] !== undefined) {
+      // Format as "Day X" based on common conference day names, or use the weekday
+      const dayLabel = dayOfWeekMap[weekday];
+      // Add slot for all time slots on that day (mark as unavailable all day)
+      slots.push({ day: dayLabel, timeSlot: 'all' });
+    }
+  }
+
+  // Pattern 2: Standard format "Day 1: 9:00, 10:00; Day 2: 11:00"
   const dayParts = value.split(';');
 
   for (const dayPart of dayParts) {
-    const [dayName, times] = dayPart.split(':').map(s => s.trim());
+    const colonIdx = dayPart.indexOf(':');
+    if (colonIdx === -1) continue;
+
+    const dayName = dayPart.substring(0, colonIdx).trim();
+    const times = dayPart.substring(colonIdx + 1).trim();
+
     if (dayName && times) {
       const timeList = times.split(',').map(t => t.trim());
       for (const time of timeList) {
         if (time) {
-          slots.push({ day: dayName, timeSlot: time });
+          const parsedTime = parseTimeString(time);
+          slots.push({ day: dayName, timeSlot: parsedTime || time });
         }
       }
     }

@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { ThemeToggle } from './ThemeToggle';
 import { FontSizeControl } from './FontSizeControl';
+import { TimeFormatControl } from './TimeFormatControl';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -8,6 +10,17 @@ interface SettingsModalProps {
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const { settings, updateSettings, resetAll } = useSchedulerStore();
+
+  // Handle Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset all data? This cannot be undone.')) {
@@ -34,9 +47,10 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           </button>
         </div>
 
-        <div className="p-4 space-y-6">
+        <div className="p-4 space-y-6 max-h-[70vh] overflow-y-auto">
           <ThemeToggle />
           <FontSizeControl />
+          <TimeFormatControl />
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h3 className="font-medium mb-3">Display Options</h3>
@@ -49,6 +63,33 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               />
               <span className="text-sm">Show conflict warnings</span>
             </label>
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h3 className="font-medium mb-3">Editing Options</h3>
+            <div className="space-y-3">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={settings.allowEditPresenters}
+                  onChange={(e) => updateSettings({ allowEditPresenters: e.target.checked })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm">Allow editing presenters and co-presenters</span>
+              </label>
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={settings.allowEditSessions}
+                  onChange={(e) => updateSettings({ allowEditSessions: e.target.checked })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm">Allow editing sessions</span>
+              </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Enable these to edit or delete presenters and sessions in the Presenters modal.
+              </p>
+            </div>
           </div>
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">

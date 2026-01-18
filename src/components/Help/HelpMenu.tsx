@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { ShortcutsModal } from './ShortcutsModal';
 import { AboutModal } from './AboutModal';
+import { PatchNotesModal } from './PatchNotesModal';
 
 export function HelpMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showPatchNotes, setShowPatchNotes] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,6 +50,18 @@ export function HelpMenu() {
             </button>
             <button
               onClick={() => {
+                setShowPatchNotes(true);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Patch Notes
+            </button>
+            <button
+              onClick={() => {
                 setShowAbout(true);
                 setIsOpen(false);
               }}
@@ -63,6 +77,7 @@ export function HelpMenu() {
       </div>
 
       {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+      {showPatchNotes && <PatchNotesModal onClose={() => setShowPatchNotes(false)} />}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
     </>
   );

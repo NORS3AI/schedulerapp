@@ -1,4 +1,4 @@
-import { useDroppable } from '@dnd-kit/core';
+import { useDroppable, useDraggable } from '@dnd-kit/core';
 import type { Session } from '../../store/types';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 
@@ -11,16 +11,28 @@ interface DropZoneProps {
 }
 
 export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZoneProps) {
-  const { updateSession, eventConfig } = useSchedulerStore();
+  const { updateSession, eventConfig, setSelectedSessionId } = useSchedulerStore();
 
-  const { isOver, setNodeRef } = useDroppable({
+  const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `${day}-${timeSlot}-${roomId}`,
     data: { day, timeSlot, roomId },
   });
 
+  // Make scheduled sessions draggable
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: session?.id || `empty-${day}-${timeSlot}-${roomId}`,
+    disabled: !session,
+  });
+
   const room = eventConfig.rooms.find((r) => r.id === roomId);
 
-  const handleRemove = () => {
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (session) {
       updateSession(session.id, {
         day: undefined,
@@ -30,13 +42,25 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
     }
   };
 
+  const handleSessionClick = (e: React.MouseEvent) => {
+    // Don't open details if we clicked the remove button or are dragging
+    if (isDragging) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+    if (session) {
+      setSelectedSessionId(session.id);
+    }
+  };
+
   return (
     <div
-      ref={setNodeRef}
+      ref={setDropRef}
       className={`
         min-h-[80px] rounded-lg border-2 border-dashed transition-all
         ${
-          session
+          isDragging
+            ? 'opacity-50'
+            : session
             ? hasConflict
               ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
               : 'border-green-300 bg-green-50 dark:bg-green-900/20 border-solid'
@@ -47,7 +71,13 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
       `}
     >
       {session ? (
-        <div className="p-2 h-full">
+        <div
+          ref={setDragRef}
+          {...attributes}
+          {...listeners}
+          onClick={handleSessionClick}
+          className={`p-2 h-full cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
+        >
           <div className="flex items-start justify-between gap-1">
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-sm truncate">{session.sessionTitle}</h4>
@@ -58,10 +88,10 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
             <button
               onClick={handleRemove}
               className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 rounded"
-              title="Remove from slot"
+              title="Unschedule session"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           </div>

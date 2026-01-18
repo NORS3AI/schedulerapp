@@ -1,8 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
+import { formatTime } from '../../utils/timeFormatter';
 
 export function SessionDetailPopup() {
-  const { sessions, eventConfig, selectedSessionId, setSelectedSessionId } = useSchedulerStore();
+  const { sessions, eventConfig, selectedSessionId, setSelectedSessionId, updateSession, settings } = useSchedulerStore();
+  const [editingDuration, setEditingDuration] = useState(false);
+  const [editingAttendees, setEditingAttendees] = useState(false);
+  const [durationValue, setDurationValue] = useState('');
 
   const session = sessions.find((s) => s.id === selectedSessionId);
 
@@ -145,24 +149,96 @@ export function SessionDetailPopup() {
               <h4 className="font-medium text-sm text-green-600 dark:text-green-400 mb-2">Scheduled</h4>
               <p className="text-sm">
                 <span className="font-medium">{session.day}</span> at{' '}
-                <span className="font-medium">{session.timeSlot}</span> in{' '}
+                <span className="font-medium">{formatTime(session.timeSlot, settings.timeFormat)}</span> in{' '}
                 <span className="font-medium">{room?.name || 'Unknown Room'}</span>
               </p>
             </div>
           )}
 
-          {/* Duration & Attendees */}
+          {/* Duration & Attendees - Editable */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4 flex gap-4 text-sm">
-            <div>
+            <div className="flex items-center gap-2">
               <span className="text-gray-500 dark:text-gray-400">Duration: </span>
-              <span className="font-medium">{session.duration} minutes</span>
+              {editingDuration ? (
+                <input
+                  type="number"
+                  className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                  value={durationValue}
+                  onChange={(e) => setDurationValue(e.target.value)}
+                  onBlur={() => {
+                    const val = parseInt(durationValue);
+                    if (!isNaN(val) && val > 0) {
+                      updateSession(session.id, { duration: val });
+                    }
+                    setEditingDuration(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = parseInt(durationValue);
+                      if (!isNaN(val) && val > 0) {
+                        updateSession(session.id, { duration: val });
+                      }
+                      setEditingDuration(false);
+                    } else if (e.key === 'Escape') {
+                      setEditingDuration(false);
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <button
+                  onClick={() => {
+                    setDurationValue(session.duration.toString());
+                    setEditingDuration(true);
+                  }}
+                  className="font-medium hover:text-primary-600 dark:hover:text-primary-400 underline decoration-dotted cursor-pointer"
+                  title="Click to edit"
+                >
+                  {session.duration} minutes
+                </button>
+              )}
             </div>
-            {session.expectedAttendees && (
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Expected: </span>
-                <span className="font-medium">{session.expectedAttendees} attendees</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400">Expected: </span>
+              {editingAttendees ? (
+                <input
+                  type="number"
+                  className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                  value={durationValue}
+                  onChange={(e) => setDurationValue(e.target.value)}
+                  onBlur={() => {
+                    const val = parseInt(durationValue);
+                    if (!isNaN(val) && val >= 0) {
+                      updateSession(session.id, { expectedAttendees: val || undefined });
+                    }
+                    setEditingAttendees(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = parseInt(durationValue);
+                      if (!isNaN(val) && val >= 0) {
+                        updateSession(session.id, { expectedAttendees: val || undefined });
+                      }
+                      setEditingAttendees(false);
+                    } else if (e.key === 'Escape') {
+                      setEditingAttendees(false);
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <button
+                  onClick={() => {
+                    setDurationValue((session.expectedAttendees || 0).toString());
+                    setEditingAttendees(true);
+                  }}
+                  className="font-medium hover:text-primary-600 dark:hover:text-primary-400 underline decoration-dotted cursor-pointer"
+                  title="Click to edit"
+                >
+                  {session.expectedAttendees || 0} attendees
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

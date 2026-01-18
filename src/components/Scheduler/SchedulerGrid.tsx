@@ -1,23 +1,52 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { DayTabs } from './DayTabs';
 import { DropZone } from './DropZone';
 import { detectConflicts, hasConflict } from '../../utils/conflictDetector';
+import { formatTime } from '../../utils/timeFormatter';
 
 export function SchedulerGrid() {
-  const { sessions, eventConfig, selectedDay, settings } = useSchedulerStore();
+  const { sessions, eventConfig, selectedDay, settings, updateRoom } = useSchedulerStore();
+  const [editingRoom, setEditingRoom] = useState<string | null>(null);
+  const [editRoomName, setEditRoomName] = useState('');
+  const [editRoomCapacity, setEditRoomCapacity] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingRoom && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingRoom]);
+
+  const handleEditRoom = (room: { id: string; name: string; capacity: number }) => {
+    setEditingRoom(room.id);
+    setEditRoomName(room.name);
+    setEditRoomCapacity(String(room.capacity));
+  };
+
+  const handleSaveRoom = () => {
+    if (editingRoom && editRoomName.trim()) {
+      updateRoom(editingRoom, {
+        name: editRoomName.trim(),
+        capacity: parseInt(editRoomCapacity, 10) || 0,
+      });
+    }
+    setEditingRoom(null);
+  };
+
+  const handleRoomKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveRoom();
+    } else if (e.key === 'Escape') {
+      setEditingRoom(null);
+    }
+  };
 
   const conflicts = useMemo(() => {
     if (!settings.showConflicts) return [];
     return detectConflicts(sessions, eventConfig.rooms);
   }, [sessions, eventConfig.rooms, settings.showConflicts]);
-
-  const formatTime = (time: string) => {
-    const [hours, mins] = time.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${String(mins).padStart(2, '0')} ${period}`;
-  };
 
   if (eventConfig.rooms.length === 0 || eventConfig.timeSlots.length === 0) {
     return (
@@ -62,10 +91,37 @@ export function SchedulerGrid() {
                 key={room.id}
                 className="flex-1 min-w-[180px] px-2 text-center"
               >
-                <div className="bg-primary-600 text-white rounded-t-lg py-2 px-3">
-                  <div className="font-medium">{room.name}</div>
-                  <div className="text-xs opacity-80">Cap: {room.capacity}</div>
-                </div>
+                {editingRoom === room.id ? (
+                  <div className="bg-primary-600 text-white rounded-t-lg py-2 px-3">
+                    <input
+                      ref={editInputRef}
+                      type="text"
+                      value={editRoomName}
+                      onChange={(e) => setEditRoomName(e.target.value)}
+                      onKeyDown={handleRoomKeyDown}
+                      onBlur={handleSaveRoom}
+                      className="w-full bg-white/20 rounded px-2 py-0.5 text-center font-medium text-white placeholder-white/50 focus:bg-white/30 focus:outline-none"
+                      placeholder="Room name"
+                    />
+                    <input
+                      type="number"
+                      value={editRoomCapacity}
+                      onChange={(e) => setEditRoomCapacity(e.target.value)}
+                      onKeyDown={handleRoomKeyDown}
+                      className="w-16 mt-1 bg-white/20 rounded px-2 py-0.5 text-center text-xs text-white placeholder-white/50 focus:bg-white/30 focus:outline-none"
+                      placeholder="Cap"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="bg-primary-600 text-white rounded-t-lg py-2 px-3 cursor-pointer hover:bg-primary-700 transition-colors"
+                    onClick={() => handleEditRoom(room)}
+                    title="Click to edit room"
+                  >
+                    <div className="font-medium">{room.name}</div>
+                    <div className="text-xs opacity-80">Cap: {room.capacity}</div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -77,10 +133,10 @@ export function SchedulerGrid() {
                 {/* Time label */}
                 <div className="w-24 flex-shrink-0 pr-2 text-right">
                   <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {formatTime(slot.startTime)}
+                    {formatTime(slot.startTime, settings.timeFormat)}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatTime(slot.endTime)}
+                    {formatTime(slot.endTime, settings.timeFormat)}
                   </div>
                 </div>
 

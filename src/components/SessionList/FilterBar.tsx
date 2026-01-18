@@ -1,7 +1,19 @@
+import { useRef, useEffect } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 
-export function FilterBar() {
+interface FilterBarProps {
+  onInputRef?: (ref: HTMLInputElement | null) => void;
+}
+
+export function FilterBar({ onInputRef }: FilterBarProps) {
   const { searchQuery, setSearchQuery } = useSchedulerStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (onInputRef) {
+      onInputRef(inputRef.current);
+    }
+  }, [onInputRef]);
 
   return (
     <div className="relative">
@@ -19,10 +31,11 @@ export function FilterBar() {
         />
       </svg>
       <input
+        ref={inputRef}
         type="text"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        placeholder="Search sessions..."
+        placeholder="Search sessions... (Ctrl+F)"
         className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
       />
       {searchQuery && (

@@ -68,6 +68,11 @@ interface SchedulerState {
 
   // Reset
   resetAll: () => void;
+  resetSchedule: () => void;
+
+  // Auto-schedule state for undo
+  lastAutoScheduleState: Session[] | null;
+  setLastAutoScheduleState: (sessions: Session[] | null) => void;
 }
 
 const defaultEventConfig: EventConfig = {
@@ -80,9 +85,12 @@ const defaultEventConfig: EventConfig = {
 const defaultSettings: AppSettings = {
   theme: 'system',
   fontSize: 'medium',
+  timeFormat: '12h',
   showConflicts: true,
   autoSave: true,
   scheduledSessionsCollapsed: false,
+  allowEditPresenters: false,
+  allowEditSessions: false,
 };
 
 export const useSchedulerStore = create<SchedulerState>()(
@@ -223,7 +231,22 @@ export const useSchedulerStore = create<SchedulerState>()(
         draggedSessionId: null,
         selectedSessionId: null,
         scheduledCollapsed: false,
+        lastAutoScheduleState: null,
       }),
+
+      resetSchedule: () => set((state) => ({
+        sessions: state.sessions.map((s) => ({
+          ...s,
+          day: undefined,
+          timeSlot: undefined,
+          roomId: undefined,
+        })),
+        lastAutoScheduleState: null,
+      })),
+
+      // Auto-schedule state
+      lastAutoScheduleState: null,
+      setLastAutoScheduleState: (sessions) => set({ lastAutoScheduleState: sessions }),
     }),
     {
       name: 'scheduler-2026-storage',

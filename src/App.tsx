@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSchedulerStore } from './store/useSchedulerStore';
 import { Header } from './components/Layout/Header';
 import { SplitPane } from './components/Layout/SplitPane';
@@ -8,6 +8,8 @@ import { SessionDetailPopup } from './components/SessionList/SessionDetailPopup'
 import { SchedulerGrid } from './components/Scheduler/SchedulerGrid';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { SessionCard } from './components/SessionList/SessionCard';
+import { ShortcutsModal } from './components/Help/ShortcutsModal';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 function App() {
   const {
@@ -19,6 +21,26 @@ function App() {
     updateSession,
     selectedSessionId,
   } = useSchedulerStore();
+
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
+
+  const handleShowHelp = useCallback(() => {
+    setShowShortcuts(true);
+  }, []);
+
+  const handleShowSearch = useCallback(() => {
+    if (searchInputRef) {
+      searchInputRef.focus();
+      searchInputRef.select();
+    }
+  }, [searchInputRef]);
+
+  // Global keyboard shortcuts
+  useKeyboardShortcuts({
+    onShowHelp: handleShowHelp,
+    onShowSearch: handleShowSearch,
+  });
 
   // Apply theme
   useEffect(() => {
@@ -52,10 +74,18 @@ function App() {
     const { active, over } = event;
     setDraggedSessionId(null);
 
-    if (over && active.id !== over.id) {
-      const dropData = over.data.current as { day: string; timeSlot: string; roomId: string } | undefined;
+    if (over) {
+      const dropData = over.data.current as { day?: string; timeSlot?: string; roomId?: string; action?: string } | undefined;
 
-      if (dropData) {
+      if (dropData?.action === 'unschedule') {
+        // Unschedule the session
+        updateSession(active.id as string, {
+          day: undefined,
+          timeSlot: undefined,
+          roomId: undefined,
+        });
+      } else if (dropData?.day && dropData?.timeSlot && dropData?.roomId) {
+        // Schedule to a specific slot
         updateSession(active.id as string, {
           day: dropData.day,
           timeSlot: dropData.timeSlot,
@@ -78,7 +108,7 @@ function App() {
 
         <main className="h-[calc(100vh-64px)]">
           <SplitPane
-            left={<SessionList />}
+            left={<SessionList onSearchInputRef={setSearchInputRef} />}
             right={<SchedulerGrid />}
           />
         </main>
@@ -90,6 +120,7 @@ function App() {
         </DragOverlay>
 
         {selectedSessionId && <SessionDetailPopup />}
+        {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
       </div>
     </DndContext>
   );

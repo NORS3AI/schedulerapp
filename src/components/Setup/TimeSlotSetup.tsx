@@ -73,7 +73,13 @@ export function TimeSlotSetup({ onComplete, onBack }: TimeSlotSetupProps) {
 
       <div className="mb-4">
         <p className="text-sm font-medium mb-2">Quick Generate (9 AM - 5 PM)</p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => handleQuickGenerate(15)}
+            className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+          >
+            15 min slots
+          </button>
           <button
             onClick={() => handleQuickGenerate(30)}
             className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"

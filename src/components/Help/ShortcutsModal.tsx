@@ -1,10 +1,23 @@
+import { useEffect } from 'react';
+
 interface ShortcutsModalProps {
   onClose: () => void;
 }
 
 export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
+  // Handle Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const shortcuts = [
-    { key: 'Ctrl + S', action: 'Export schedule as CSV' },
+    { key: 'Ctrl + S', action: 'Export schedule as PDF' },
     { key: 'Ctrl + P', action: 'Print schedule' },
     { key: 'Ctrl + F', action: 'Focus search' },
     { key: 'Esc', action: 'Clear search / Close modal' },

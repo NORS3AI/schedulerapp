@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { ImportStep } from './ImportStep';
 import { ColumnMapper } from './ColumnMapper';
+import { AvailabilitySetup } from './AvailabilitySetup';
 import { EventSetup } from './EventSetup';
 import { RoomSetup } from './RoomSetup';
 import { TimeSlotSetup } from './TimeSlotSetup';
@@ -24,10 +25,11 @@ export function WelcomeModal() {
   const steps = [
     { key: 'welcome', label: 'Welcome' },
     { key: 'import', label: 'Import' },
-    { key: 'columns', label: 'Map Columns' },
+    { key: 'columns', label: 'Mapping' },
+    { key: 'availability', label: 'Availability' },
     { key: 'event', label: 'Event' },
     { key: 'rooms', label: 'Rooms' },
-    { key: 'timeslots', label: 'Time Slots' },
+    { key: 'timeslots', label: 'Times' },
   ];
 
   const currentIndex = steps.findIndex((s) => s.key === setupStep);
@@ -97,8 +99,16 @@ export function WelcomeModal() {
       case 'columns':
         return (
           <ColumnMapper
-            onNext={() => setSetupStep('event')}
+            onNext={() => setSetupStep('availability')}
             onBack={() => setSetupStep('import')}
+          />
+        );
+
+      case 'availability':
+        return (
+          <AvailabilitySetup
+            onNext={() => setSetupStep('event')}
+            onBack={() => setSetupStep('columns')}
           />
         );
 
@@ -106,7 +116,7 @@ export function WelcomeModal() {
         return (
           <EventSetup
             onNext={() => setSetupStep('rooms')}
-            onBack={() => setSetupStep('columns')}
+            onBack={() => setSetupStep('availability')}
           />
         );
 
@@ -134,11 +144,18 @@ export function WelcomeModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative">
-        {/* Safe close button - red X */}
+        {/* Import Wizard Title Header */}
+        {setupStep !== 'welcome' && (
+          <div className="bg-primary-600 py-3 px-6">
+            <h1 className="text-xl font-bold text-white text-center">Import Wizard</h1>
+          </div>
+        )}
+
+        {/* Safe close button - red X (only shows when not on welcome step) */}
         {canSafeClose && (
           <button
             onClick={handleSafeClose}
-            className="absolute top-3 right-3 z-10 p-2 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+            className="absolute right-3 top-3 z-10 p-2 rounded-lg transition-colors text-white/80 hover:text-white hover:bg-white/20"
             title="Close and keep current data (Esc)"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

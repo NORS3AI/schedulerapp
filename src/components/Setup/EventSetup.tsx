@@ -14,10 +14,9 @@ interface EventSetupProps {
 interface SortableDayProps {
   day: DayConfig;
   onRemove: (id: string) => void;
-  canRemove: boolean;
 }
 
-function SortableDay({ day, onRemove, canRemove }: SortableDayProps) {
+function SortableDay({ day, onRemove }: SortableDayProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: day.id,
   });
@@ -44,16 +43,15 @@ function SortableDay({ day, onRemove, canRemove }: SortableDayProps) {
         </svg>
       </button>
       <span className="flex-1">{day.name}</span>
-      {canRemove && (
-        <button
-          onClick={() => onRemove(day.id)}
-          className="text-primary-500 hover:text-red-500 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
+      <button
+        onClick={() => onRemove(day.id)}
+        className="text-primary-500 hover:text-red-500 transition-colors"
+        title="Remove day"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -80,9 +78,8 @@ export function EventSetup({ onNext, onBack }: EventSetupProps) {
   };
 
   const handleRemoveDay = (id: string) => {
-    if (localDays.length > 1) {
-      setLocalDays(localDays.filter((d) => d.id !== id).map((d, i) => ({ ...d, order: i })));
-    }
+    // Allow removing even the last day (user can add new ones)
+    setLocalDays(localDays.filter((d) => d.id !== id).map((d, i) => ({ ...d, order: i })));
   };
 
   const handleQuickAdd = (count: number) => {
@@ -110,7 +107,8 @@ export function EventSetup({ onNext, onBack }: EventSetupProps) {
     onNext();
   };
 
-  const isValid = name.trim() && localDays.length > 0;
+  // Require only event name - days can be added later
+  const isValid = name.trim().length > 0;
 
   return (
     <div>
@@ -172,7 +170,6 @@ export function EventSetup({ onNext, onBack }: EventSetupProps) {
                     key={day.id}
                     day={day}
                     onRemove={handleRemoveDay}
-                    canRemove={localDays.length > 1}
                   />
                 ))}
               </div>

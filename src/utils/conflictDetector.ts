@@ -65,9 +65,24 @@ export function detectConflicts(
   // Check availability conflicts (scheduled during unavailable time)
   for (const session of scheduledSessions) {
     if (session.unavailability && session.unavailability.length > 0) {
-      const isUnavailable = session.unavailability.some(
-        (slot) => slot.day === session.day && slot.timeSlot === session.timeSlot
-      );
+      const isUnavailable = session.unavailability.some((slot) => {
+        // Check day match (case insensitive, partial match)
+        const dayMatch =
+          slot.day === session.day ||
+          slot.day.toLowerCase() === session.day?.toLowerCase() ||
+          session.day?.toLowerCase().includes(slot.day.toLowerCase());
+
+        if (!dayMatch) return false;
+
+        // Check time slot - '*' means all day
+        if (slot.timeSlot === '*') return true;
+
+        return (
+          slot.timeSlot === session.timeSlot ||
+          slot.timeSlot.toLowerCase() === session.timeSlot?.toLowerCase()
+        );
+      });
+
       if (isUnavailable) {
         conflicts.push({
           type: 'availability',
@@ -113,9 +128,24 @@ export function isPresenterAvailable(
 ): { available: boolean; reason?: string } {
   // Check unavailability
   if (session.unavailability && session.unavailability.length > 0) {
-    const isUnavailable = session.unavailability.some(
-      (slot) => slot.day === day && slot.timeSlot === timeSlot
-    );
+    const isUnavailable = session.unavailability.some((slot) => {
+      // Check day match (case insensitive, partial match)
+      const dayMatch =
+        slot.day === day ||
+        slot.day.toLowerCase() === day.toLowerCase() ||
+        day.toLowerCase().includes(slot.day.toLowerCase());
+
+      if (!dayMatch) return false;
+
+      // Check time slot - '*' means all day
+      if (slot.timeSlot === '*') return true;
+
+      return (
+        slot.timeSlot === timeSlot ||
+        slot.timeSlot.toLowerCase() === timeSlot.toLowerCase()
+      );
+    });
+
     if (isUnavailable) {
       return {
         available: false,

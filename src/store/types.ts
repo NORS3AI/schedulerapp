@@ -48,17 +48,28 @@ export interface Session {
   presenterPhone?: string;
   presenterCompany?: string;
   presenterTitle?: string;
-  // Co-presenter
+  // Co-presenters (can have multiple)
   coPresenterName?: string;
   coPresenterFirstName?: string;
   coPresenterLastName?: string;
+  coPresenterTitle?: string;
+  coPresenterCompany?: string;
   coPresenterEmail?: string;
   coPresenterPhone?: string;
+  // Additional co-presenters
+  coPresenters?: Array<{
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  }>;
   // Session/Breakout info
   sessionTitle: string;
   description?: string;
   duration: number; // in minutes
   breakoutNumber?: 1 | 2 | 3;
+  masteryLevel?: MasteryLevel;
   // Scheduling (can be from CSV or assigned via drag-drop)
   day?: string;
   timeSlot?: string;
@@ -66,6 +77,8 @@ export interface Session {
   expectedAttendees?: number;
   // Availability - time slots when presenter is NOT available
   unavailability?: UnavailabilitySlot[];
+  // Raw unavailability text for display
+  unavailabilityText?: string;
   // Original CSV data for preservation
   originalData?: Record<string, string>;
   // Reference to source presenter row
@@ -120,25 +133,48 @@ export interface ColumnMapping {
   presenterPhone?: ColumnMappingValue;
   presenterCompany?: ColumnMappingValue;
   presenterTitle?: ColumnMappingValue;
-  // Co-presenter info
+  // Optional presenter custom fields
+  presenterCustom1?: ColumnMappingValue;
+  presenterCustom2?: ColumnMappingValue;
+  presenterCustom3?: ColumnMappingValue;
+  // Co-presenter info (primary)
   coPresenterFirstName?: ColumnMappingValue;
   coPresenterLastName?: ColumnMappingValue;
+  coPresenterTitle?: ColumnMappingValue;
+  coPresenterCompany?: ColumnMappingValue;
   coPresenterEmail?: ColumnMappingValue;
   coPresenterPhone?: ColumnMappingValue;
+  // Additional co-presenters (dynamic)
+  additionalCoPresenters?: Array<{
+    firstName?: ColumnMappingValue;
+    lastName?: ColumnMappingValue;
+    email?: ColumnMappingValue;
+    phone?: ColumnMappingValue;
+  }>;
   // Breakout 1
   breakout1Title?: ColumnMappingValue;
   breakout1Description?: ColumnMappingValue;
+  breakout1MasteryLevel?: ColumnMappingValue;
   // Breakout 2
   breakout2Title?: ColumnMappingValue;
   breakout2Description?: ColumnMappingValue;
+  breakout2MasteryLevel?: ColumnMappingValue;
   // Breakout 3
   breakout3Title?: ColumnMappingValue;
   breakout3Description?: ColumnMappingValue;
-  // Other fields
+  breakout3MasteryLevel?: ColumnMappingValue;
+  // Other fields (dynamic list)
   duration?: ColumnMappingValue;
   expectedAttendees?: ColumnMappingValue;
+  customFields?: Array<{
+    key: string;
+    label: string;
+    mapping: ColumnMappingValue;
+  }>;
   // Availability columns (comma-separated or multiple columns)
   unavailableTimes?: ColumnMappingValue;
+  // Availability column headers for smart parsing
+  availabilityColumns?: string[];
   // Columns to ignore/delete
   ignoredColumns?: string[];
 }
@@ -153,14 +189,23 @@ export interface Conflict {
 // Extended font size options
 export type FontSize = 'smallest' | 'smaller' | 'small' | 'medium' | 'large' | 'larger' | 'huge';
 
+// Time format options
+export type TimeFormat = '12h' | '24h';
+
+// Mastery level options
+export type MasteryLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+
 // App settings
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   fontSize: FontSize;
+  timeFormat: TimeFormat;
   showConflicts: boolean;
   autoSave: boolean;
   scheduledSessionsCollapsed: boolean;
+  allowEditPresenters: boolean;
+  allowEditSessions: boolean;
 }
 
 // Setup wizard state
-export type SetupStep = 'welcome' | 'import' | 'columns' | 'event' | 'rooms' | 'timeslots' | 'complete';
+export type SetupStep = 'welcome' | 'import' | 'columns' | 'availability' | 'event' | 'rooms' | 'timeslots' | 'complete';
