@@ -16,6 +16,7 @@ function App() {
     setupComplete,
     settings,
     sessions,
+    eventConfig,
     draggedSessionId,
     setDraggedSessionId,
     updateSession,
@@ -105,6 +106,12 @@ function App() {
         {!setupComplete && <WelcomeModal />}
 
         <Header />
+
+        {/* Print-only header */}
+        <div className="print-header hidden print:block">
+          <h1>{eventConfig.name || 'Conference Schedule'}</h1>
+          <p>Printed on {new Date().toLocaleDateString()}</p>
+        </div>
 
         <main className="h-[calc(100vh-64px)]">
           <SplitPane

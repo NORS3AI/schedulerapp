@@ -4,9 +4,10 @@ interface ExportMenuProps {
   onExportCsv: () => void;
   onExportPdf: () => void;
   onPrint: () => void;
+  onCustomExport: () => void;
 }
 
-export function ExportMenu({ onExportCsv, onExportPdf, onPrint }: ExportMenuProps) {
+export function ExportMenu({ onExportCsv, onExportPdf, onPrint, onCustomExport }: ExportMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +50,18 @@ export function ExportMenu({ onExportCsv, onExportPdf, onPrint }: ExportMenuProp
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             Export as CSV
+          </button>
+          <button
+            onClick={() => {
+              onCustomExport();
+              setIsOpen(false);
+            }}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            Custom Export...
           </button>
           <button
             onClick={() => {

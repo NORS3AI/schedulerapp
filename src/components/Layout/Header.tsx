@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { autoSchedule } from '../../utils/autoScheduler';
-import { exportAndDownload } from '../../utils/exportCsv';
+import { exportAndDownload, exportCustomCsv, downloadCSV } from '../../utils/exportCsv';
 import { exportScheduleToPdf } from '../../utils/exportPdf';
 import { detectConflicts } from '../../utils/conflictDetector';
 import { SettingsModal } from '../Settings/SettingsModal';
 import { HelpMenu } from '../Help/HelpMenu';
 import { ExportMenu } from '../Export/ExportMenu';
+import { CustomExportModal, type ExportField, type ExportType } from '../Export/CustomExportModal';
 import { PresenterListModal } from '../Presenters/PresenterListModal';
 import { ConflictsModal } from '../Conflicts/ConflictsModal';
 
@@ -26,6 +27,7 @@ export function Header() {
   const [showSettings, setShowSettings] = useState(false);
   const [showPresenterList, setShowPresenterList] = useState(false);
   const [showConflicts, setShowConflicts] = useState(false);
+  const [showCustomExport, setShowCustomExport] = useState(false);
   const [isAutoScheduling, setIsAutoScheduling] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(eventConfig.name);
@@ -92,6 +94,28 @@ export function Header() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleCustomExport = async (fields: ExportField[], exportType: ExportType) => {
+    const date = new Date().toISOString().split('T')[0];
+
+    if (exportType === 'csv') {
+      const csv = exportCustomCsv(sessions, eventConfig.rooms, fields);
+      const filename = `${eventConfig.name.replace(/[^a-z0-9]/gi, '_')}_custom_${date}.csv`;
+      downloadCSV(csv, filename);
+    } else if (exportType === 'pdf') {
+      // Export to PDF (uses grid layout, not custom fields)
+      await exportScheduleToPdf({
+        title: eventConfig.name,
+        days: eventConfig.days.map(d => d.name),
+        timeSlots: eventConfig.timeSlots,
+        rooms: eventConfig.rooms,
+        sessions,
+      });
+    } else if (exportType === 'print') {
+      // For print, we trigger the browser print dialog
+      window.print();
+    }
   };
 
   const handleTitleClick = () => {
@@ -262,6 +286,7 @@ export function Header() {
             onExportCsv={handleExportCsv}
             onExportPdf={handleExportPdf}
             onPrint={handlePrint}
+            onCustomExport={() => setShowCustomExport(true)}
           />
 
           <button
@@ -282,6 +307,11 @@ export function Header() {
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showPresenterList && <PresenterListModal onClose={() => setShowPresenterList(false)} />}
       {showConflicts && <ConflictsModal onClose={() => setShowConflicts(false)} />}
+      <CustomExportModal
+        isOpen={showCustomExport}
+        onClose={() => setShowCustomExport(false)}
+        onExport={handleCustomExport}
+      />
     </>
   );
 }

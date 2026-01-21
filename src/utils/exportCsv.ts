@@ -1,4 +1,54 @@
 import type { Session, Room } from '../store/types';
+import type { ExportField } from '../components/Export/CustomExportModal';
+
+// Get field value from session
+function getFieldValue(session: Session, key: string, rooms: Room[]): string {
+  switch (key) {
+    case 'day':
+      return session.day || '';
+    case 'timeSlot':
+      return session.timeSlot || '';
+    case 'room':
+      const room = rooms.find((r) => r.id === session.roomId);
+      return room?.name || '';
+    case 'sessionTitle':
+      return session.sessionTitle;
+    case 'description':
+      return session.description || '';
+    case 'presenterName':
+      return session.presenterName;
+    case 'presenterFirstName':
+      return session.presenterFirstName || '';
+    case 'presenterLastName':
+      return session.presenterLastName || '';
+    case 'presenterEmail':
+      return session.presenterEmail || '';
+    case 'presenterPhone':
+      return session.presenterPhone || '';
+    case 'presenterCompany':
+      return session.presenterCompany || '';
+    case 'presenterTitle':
+      return session.presenterTitle || '';
+    case 'coPresenterName':
+      return session.coPresenterName || '';
+    case 'coPresenterEmail':
+      return session.coPresenterEmail || '';
+    case 'coPresenterPhone':
+      return session.coPresenterPhone || '';
+    case 'duration':
+      return session.duration.toString();
+    case 'expectedAttendees':
+      return session.expectedAttendees?.toString() || '';
+    case 'masteryLevel':
+      return session.masteryLevel || '';
+    case 'breakoutNumber':
+      return session.breakoutNumber?.toString() || '';
+    case 'capacityLevel':
+      return session.capacityLevel || '';
+    default:
+      return '';
+  }
+}
 
 export function exportScheduleToCsv(
   sessions: Session[],
@@ -31,6 +81,26 @@ export function exportScheduleToCsv(
       escapeCSV(room?.name || ''),
       session.expectedAttendees?.toString() || '',
     ];
+  });
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) => row.join(',')),
+  ].join('\n');
+
+  return csvContent;
+}
+
+// Export with custom field selection and order
+export function exportCustomCsv(
+  sessions: Session[],
+  rooms: Room[],
+  fields: ExportField[]
+): string {
+  const headers = fields.map((f) => f.label);
+
+  const rows = sessions.map((session) => {
+    return fields.map((field) => escapeCSV(getFieldValue(session, field.key, rooms)));
   });
 
   const csvContent = [

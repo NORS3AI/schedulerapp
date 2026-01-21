@@ -26,39 +26,59 @@ const fieldConfigs: FieldConfig[] = [
   { key: 'presenterCustom2', label: 'Custom Field 2', group: 'Presenter' },
   { key: 'presenterCustom3', label: 'Custom Field 3', group: 'Presenter' },
   // Co-Presenter
-  { key: 'coPresenterFirstName', label: 'First Name', group: 'Co-Presenter' },
-  { key: 'coPresenterLastName', label: 'Last Name', group: 'Co-Presenter' },
-  { key: 'coPresenterTitle', label: 'Job Title', group: 'Co-Presenter' },
-  { key: 'coPresenterCompany', label: 'Company / Organization', group: 'Co-Presenter' },
-  { key: 'coPresenterEmail', label: 'Email', group: 'Co-Presenter' },
-  { key: 'coPresenterPhone', label: 'Phone', group: 'Co-Presenter' },
+  { key: 'coPresenterFirstName', label: 'First Name 2', group: 'Co-Presenter' },
+  { key: 'coPresenterLastName', label: 'Last Name 2', group: 'Co-Presenter' },
+  { key: 'coPresenterTitle', label: 'Co-Presenter Title', group: 'Co-Presenter' },
+  { key: 'coPresenterCompany', label: 'Co-Presenter Company Name', group: 'Co-Presenter' },
+  { key: 'coPresenterEmail', label: 'Co-Presenter Email', group: 'Co-Presenter' },
+  { key: 'coPresenterPhone', label: 'Co-Presenter Phone', group: 'Co-Presenter' },
   // Breakout 1
-  { key: 'breakout1Title', label: '(1) Breakout Topic / Title', group: 'Breakout 1' },
-  { key: 'breakout1Description', label: '(1) Breakout Description', group: 'Breakout 1' },
-  { key: 'breakout1MasteryLevel', label: '(1) Mastery Level', group: 'Breakout 1' },
+  { key: 'breakout1Title', label: 'Breakout 1 Title', group: 'Breakout 1' },
+  { key: 'breakout1Description', label: 'Breakout 1 Description', group: 'Breakout 1' },
+  { key: 'breakout1MasteryLevel', label: 'Breakout 1 Mastery Level', group: 'Breakout 1' },
   // Breakout 2
-  { key: 'breakout2Title', label: '(2) Breakout Topic / Title', group: 'Breakout 2' },
-  { key: 'breakout2Description', label: '(2) Breakout Description', group: 'Breakout 2' },
-  { key: 'breakout2MasteryLevel', label: '(2) Mastery Level', group: 'Breakout 2' },
+  { key: 'breakout2Title', label: 'Breakout 2 Title', group: 'Breakout 2' },
+  { key: 'breakout2Description', label: 'Breakout 2 Description', group: 'Breakout 2' },
+  { key: 'breakout2MasteryLevel', label: 'Breakout 2 Mastery Level', group: 'Breakout 2' },
   // Breakout 3
-  { key: 'breakout3Title', label: '(3) Breakout Topic / Title', group: 'Breakout 3' },
-  { key: 'breakout3Description', label: '(3) Breakout Description', group: 'Breakout 3' },
-  { key: 'breakout3MasteryLevel', label: '(3) Mastery Level', group: 'Breakout 3' },
+  { key: 'breakout3Title', label: 'Breakout 3 Title', group: 'Breakout 3' },
+  { key: 'breakout3Description', label: 'Breakout 3 Description', group: 'Breakout 3' },
+  { key: 'breakout3MasteryLevel', label: 'Breakout 3 Mastery Level', group: 'Breakout 3' },
   // Other
   { key: 'duration', label: 'Duration (minutes)', group: 'Other' },
   { key: 'expectedAttendees', label: 'Expected Attendees', group: 'Other' },
-  { key: 'unavailableTimes', label: 'Unavailable Times', group: 'Other' },
+  { key: 'unavailableTimes', label: 'Availability Times', group: 'Other' },
 ];
 
 // Auto-detect matching columns for breakout fields
-function detectMatchingColumn(headers: string[], patterns: string[]): string | undefined {
-  const lowerHeaders = headers.map(h => h.toLowerCase());
+// Priority: exact match first, then contains match
+function detectMatchingColumn(headers: string[], patterns: string[], usedColumns?: Set<string>): string | undefined {
+  const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+
+  // First pass: exact match (after lowercase and trim)
   for (const pattern of patterns) {
-    const idx = lowerHeaders.findIndex(h => h.includes(pattern.toLowerCase()));
+    const lowerPattern = pattern.toLowerCase().trim();
+    const idx = lowerHeaders.findIndex((h, i) => {
+      if (usedColumns && usedColumns.has(headers[i])) return false;
+      return h === lowerPattern;
+    });
     if (idx !== -1) {
       return headers[idx];
     }
   }
+
+  // Second pass: contains match (but skip if column already used)
+  for (const pattern of patterns) {
+    const lowerPattern = pattern.toLowerCase().trim();
+    const idx = lowerHeaders.findIndex((h, i) => {
+      if (usedColumns && usedColumns.has(headers[i])) return false;
+      return h.includes(lowerPattern);
+    });
+    if (idx !== -1) {
+      return headers[idx];
+    }
+  }
+
   return undefined;
 }
 
@@ -78,21 +98,24 @@ const autoIgnorePatterns = [
 ];
 
 export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
-  const { rawCsvData, csvHeaders, columnMapping, setColumnMapping, setSessions } =
+  const { rawCsvData, csvHeaders, columnMapping, setColumnMapping, setSessions, sessions: existingSessions } =
     useSchedulerStore();
 
   const [localMapping, setLocalMapping] = useState<ColumnMapping>(columnMapping);
   const [ignoredColumns, setIgnoredColumns] = useState<string[]>(columnMapping.ignoredColumns || []);
+  const [defaultDuration, setDefaultDuration] = useState<number>(columnMapping.defaultDuration || 50);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     'Presenter': true,
+    'Co-Presenter': true,
     'Breakout 1': true,
   });
+  const [importMode, setImportMode] = useState<'replace' | 'merge'>('replace');
 
   const availableHeaders = csvHeaders.filter(h => !ignoredColumns.includes(h));
 
-  // Auto-detect and set default mappings on initial load
+  // Auto-detect and set default mappings when CSV headers are loaded
   useEffect(() => {
-    if (csvHeaders.length > 0 && Object.keys(columnMapping).length === 0) {
+    if (csvHeaders.length > 0) {
       const detectedMapping: ColumnMapping = {};
 
       // Auto-ignore columns matching patterns
@@ -107,16 +130,34 @@ export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
         setIgnoredColumns(autoIgnored);
       }
 
-      // Detect breakout columns
-      const breakout1Title = detectMatchingColumn(csvHeaders, ['breakout 1', 'session 1', 'topic 1', '(1) breakout', '(1) topic', '(1) title']);
-      const breakout1Desc = detectMatchingColumn(csvHeaders, ['(1) description', 'description 1', 'breakout 1 desc']);
-      const breakout1Mastery = detectMatchingColumn(csvHeaders, ['(1) mastery', '(1) level', 'mastery level 1', 'what mastery level would you consider breakout 1', 'mastery level would you consider breakout 1']);
-      const breakout2Title = detectMatchingColumn(csvHeaders, ['breakout 2', 'session 2', 'topic 2', '(2) breakout', '(2) topic', '(2) title']);
-      const breakout2Desc = detectMatchingColumn(csvHeaders, ['(2) description', 'description 2', 'breakout 2 desc']);
-      const breakout2Mastery = detectMatchingColumn(csvHeaders, ['(2) mastery', '(2) level', 'mastery level 2', 'what mastery level would you consider breakout 2', 'mastery level would you consider breakout 2']);
-      const breakout3Title = detectMatchingColumn(csvHeaders, ['breakout 3', 'session 3', 'topic 3', '(3) breakout', '(3) topic', '(3) title']);
-      const breakout3Desc = detectMatchingColumn(csvHeaders, ['(3) description', 'description 3', 'breakout 3 desc']);
-      const breakout3Mastery = detectMatchingColumn(csvHeaders, ['(3) mastery', '(3) level', 'mastery level 3', 'what mastery level would you consider breakout 3', 'mastery level would you consider breakout 3']);
+      // Detect breakout columns - including specific long-form column names
+      const breakout1Title = detectMatchingColumn(csvHeaders, [
+        '(1) breakout topic / title', '(1) breakout topic', 'breakout 1 title', 'breakout 1', 'session 1', 'topic 1', '(1) breakout', '(1) topic', '(1) title'
+      ]);
+      const breakout1Desc = detectMatchingColumn(csvHeaders, [
+        '(1) breakout description', 'breakout 1 description', '(1) description', 'description 1', 'breakout 1 desc'
+      ]);
+      const breakout1Mastery = detectMatchingColumn(csvHeaders, [
+        '(1) mastery levels for your class', 'mastery levels for the breakout title', 'breakout 1 mastery', '(1) mastery', '(1) level', 'mastery level 1'
+      ]);
+      const breakout2Title = detectMatchingColumn(csvHeaders, [
+        '(2) breakout topic / title', '(2) breakout topic', 'breakout 2 title', 'breakout 2', 'session 2', 'topic 2', '(2) breakout', '(2) topic', '(2) title'
+      ]);
+      const breakout2Desc = detectMatchingColumn(csvHeaders, [
+        '(2) breakout description', 'breakout 2 description', '(2) description', 'description 2', 'breakout 2 desc'
+      ]);
+      const breakout2Mastery = detectMatchingColumn(csvHeaders, [
+        '(2) mastery levels for your class', 'breakout 2 mastery', '(2) mastery', '(2) level', 'mastery level 2'
+      ]);
+      const breakout3Title = detectMatchingColumn(csvHeaders, [
+        '(3) breakout topic / title', '(3) breakout topic', 'breakout 3 title', 'breakout 3', 'session 3', 'topic 3', '(3) breakout', '(3) topic', '(3) title'
+      ]);
+      const breakout3Desc = detectMatchingColumn(csvHeaders, [
+        '(3) breakout description', 'breakout 3 description', '(3) description', 'description 3', 'breakout 3 desc'
+      ]);
+      const breakout3Mastery = detectMatchingColumn(csvHeaders, [
+        '(3) mastery levels for your class', 'breakout 3 mastery', '(3) mastery', '(3) level', 'mastery level 3'
+      ]);
 
       if (breakout1Title) detectedMapping.breakout1Title = { type: 'column', column: breakout1Title };
       if (breakout1Desc) detectedMapping.breakout1Description = { type: 'column', column: breakout1Desc };
@@ -128,40 +169,73 @@ export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
       if (breakout3Desc) detectedMapping.breakout3Description = { type: 'column', column: breakout3Desc };
       if (breakout3Mastery) detectedMapping.breakout3MasteryLevel = { type: 'column', column: breakout3Mastery };
 
-      // Detect presenter columns
-      const firstName = detectMatchingColumn(csvHeaders, ['first name', 'firstname', 'first']);
-      const lastName = detectMatchingColumn(csvHeaders, ['last name', 'lastname', 'last']);
-      const email = detectMatchingColumn(csvHeaders, ['email', 'e-mail']);
-      const phone = detectMatchingColumn(csvHeaders, ['phone', 'telephone', 'cell']);
-      const company = detectMatchingColumn(csvHeaders, ['company', 'organization', 'school', 'district']);
-      const title = detectMatchingColumn(csvHeaders, ['title', 'job title', 'position']);
+      // Track used columns to prevent double-matching
+      const usedColumns = new Set<string>();
 
-      if (firstName) detectedMapping.presenterFirstName = { type: 'column', column: firstName };
-      if (lastName) detectedMapping.presenterLastName = { type: 'column', column: lastName };
-      if (email) detectedMapping.presenterEmail = { type: 'column', column: email };
-      if (phone) detectedMapping.presenterPhone = { type: 'column', column: phone };
-      if (company) detectedMapping.presenterCompany = { type: 'column', column: company };
-      if (title) detectedMapping.presenterTitle = { type: 'column', column: title };
+      // IMPORTANT: Detect co-presenter columns FIRST to prevent "First Name 2" matching "First Name"
+      // Exact spreadsheet column names: "First Name 2", "Last Name 2", "Co-Presenter Title", "Co-Presenter Company Name", "Co-Presenter Email"
+      const coFirstName = detectMatchingColumn(csvHeaders, [
+        'first name 2',  // Exact match
+        'firstname 2', 'firstname2', 'co-presenter first name', 'co-presenter first', 'copresenter first', 'co presenter first'
+      ], usedColumns);
+      if (coFirstName) { detectedMapping.coPresenterFirstName = { type: 'column', column: coFirstName }; usedColumns.add(coFirstName); }
 
-      // Detect co-presenter columns with expanded patterns
-      // Patterns: "First Name 2", "Last Name 2", "Co-Presenter Title", "Co-Presenter Company Name", "Co-Presenter Email"
-      const coFirstName = detectMatchingColumn(csvHeaders, ['first name 2', 'firstname 2', 'co-presenter first', 'copresenter first', 'co presenter first']);
-      const coLastName = detectMatchingColumn(csvHeaders, ['last name 2', 'lastname 2', 'co-presenter last', 'copresenter last', 'co presenter last']);
-      const coTitle = detectMatchingColumn(csvHeaders, ['co-presenter title', 'copresenter title', 'title 2', 'co presenter title']);
-      const coCompany = detectMatchingColumn(csvHeaders, ['co-presenter company name', 'co-presenter company', 'copresenter company', 'company 2', 'co presenter company']);
-      const coEmail = detectMatchingColumn(csvHeaders, ['co-presenter email', 'copresenter email', 'email 2', 'co presenter email']);
-      const coPhone = detectMatchingColumn(csvHeaders, ['co-presenter phone', 'copresenter phone', 'phone 2', 'co presenter phone']);
+      const coLastName = detectMatchingColumn(csvHeaders, [
+        'last name 2',  // Exact match
+        'lastname 2', 'lastname2', 'co-presenter last name', 'co-presenter last', 'copresenter last', 'co presenter last'
+      ], usedColumns);
+      if (coLastName) { detectedMapping.coPresenterLastName = { type: 'column', column: coLastName }; usedColumns.add(coLastName); }
 
-      if (coFirstName) detectedMapping.coPresenterFirstName = { type: 'column', column: coFirstName };
-      if (coLastName) detectedMapping.coPresenterLastName = { type: 'column', column: coLastName };
-      if (coTitle) detectedMapping.coPresenterTitle = { type: 'column', column: coTitle };
-      if (coCompany) detectedMapping.coPresenterCompany = { type: 'column', column: coCompany };
-      if (coEmail) detectedMapping.coPresenterEmail = { type: 'column', column: coEmail };
-      if (coPhone) detectedMapping.coPresenterPhone = { type: 'column', column: coPhone };
+      const coTitle = detectMatchingColumn(csvHeaders, [
+        'co-presenter title',  // Exact match
+        'copresenter title', 'co presenter title', 'title 2'
+      ], usedColumns);
+      if (coTitle) { detectedMapping.coPresenterTitle = { type: 'column', column: coTitle }; usedColumns.add(coTitle); }
 
-      // Detect unavailability columns
-      const unavailable = detectMatchingColumn(csvHeaders, ['unavailable', 'not available', 'will not be able', 'cannot attend', 'i will not be able']);
-      if (unavailable) detectedMapping.unavailableTimes = { type: 'column', column: unavailable };
+      const coCompany = detectMatchingColumn(csvHeaders, [
+        'co-presenter company name',  // Exact match
+        'co-presenter company', 'copresenter company name', 'copresenter company', 'company 2', 'co presenter company'
+      ], usedColumns);
+      if (coCompany) { detectedMapping.coPresenterCompany = { type: 'column', column: coCompany }; usedColumns.add(coCompany); }
+
+      const coEmail = detectMatchingColumn(csvHeaders, [
+        'co-presenter email',  // Exact match
+        'copresenter email', 'co presenter email', 'email 2'
+      ], usedColumns);
+      if (coEmail) { detectedMapping.coPresenterEmail = { type: 'column', column: coEmail }; usedColumns.add(coEmail); }
+
+      const coPhone = detectMatchingColumn(csvHeaders, [
+        'co-presenter phone',  // Exact match
+        'copresenter phone', 'co presenter phone', 'phone 2'
+      ], usedColumns);
+      if (coPhone) { detectedMapping.coPresenterPhone = { type: 'column', column: coPhone }; usedColumns.add(coPhone); }
+
+      // Now detect presenter columns (after co-presenter to avoid matching "First Name 2" as "First Name")
+      const firstName = detectMatchingColumn(csvHeaders, ['first name', 'firstname', 'first'], usedColumns);
+      if (firstName) { detectedMapping.presenterFirstName = { type: 'column', column: firstName }; usedColumns.add(firstName); }
+
+      const lastName = detectMatchingColumn(csvHeaders, ['last name', 'lastname', 'last'], usedColumns);
+      if (lastName) { detectedMapping.presenterLastName = { type: 'column', column: lastName }; usedColumns.add(lastName); }
+
+      const email = detectMatchingColumn(csvHeaders, ['email', 'e-mail'], usedColumns);
+      if (email) { detectedMapping.presenterEmail = { type: 'column', column: email }; usedColumns.add(email); }
+
+      const phone = detectMatchingColumn(csvHeaders, ['phone', 'telephone', 'cell'], usedColumns);
+      if (phone) { detectedMapping.presenterPhone = { type: 'column', column: phone }; usedColumns.add(phone); }
+
+      const company = detectMatchingColumn(csvHeaders, ['company', 'organization', 'school', 'district'], usedColumns);
+      if (company) { detectedMapping.presenterCompany = { type: 'column', column: company }; usedColumns.add(company); }
+
+      const title = detectMatchingColumn(csvHeaders, ['title', 'job title', 'position'], usedColumns);
+      if (title) { detectedMapping.presenterTitle = { type: 'column', column: title }; usedColumns.add(title); }
+
+      // Detect availability columns (times when presenter CAN teach)
+      const availability = detectMatchingColumn(csvHeaders, [
+        'availability', 'available times', 'available', 'times available',
+        'when can you', 'can teach', 'able to present', 'able to teach',
+        'unavailable', 'not available', 'will not be able', 'cannot attend', 'i will not be able'
+      ]);
+      if (availability) detectedMapping.unavailableTimes = { type: 'column', column: availability };
 
       if (Object.keys(detectedMapping).length > 0) {
         setLocalMapping(detectedMapping);
@@ -196,10 +270,17 @@ export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
   };
 
   const handleNext = () => {
-    const finalMapping = { ...localMapping, ignoredColumns };
+    const finalMapping = { ...localMapping, ignoredColumns, defaultDuration };
     setColumnMapping(finalMapping);
-    const sessions = mapDataToSessions(rawCsvData, finalMapping);
-    setSessions(sessions);
+    const newSessions = mapDataToSessions(rawCsvData, finalMapping);
+
+    if (importMode === 'merge' && existingSessions.length > 0) {
+      // Merge mode: append new sessions to existing
+      setSessions([...existingSessions, ...newSessions]);
+    } else {
+      // Replace mode: replace all sessions
+      setSessions(newSessions);
+    }
     onNext();
   };
 
@@ -265,6 +346,44 @@ export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
         Match your CSV columns to session fields. Select &lt;none&gt; for irrelevant fields or enter custom values.
         Columns matching common patterns are auto-detected.
       </p>
+
+      {/* Import Mode Toggle - only show if there are existing sessions */}
+      {existingSessions.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="font-medium text-blue-700 dark:text-blue-300">
+                {existingSessions.length} existing session{existingSessions.length !== 1 ? 's' : ''} found
+              </span>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                Choose how to handle the imported data
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setImportMode('replace')}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  importMode === 'replace'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30'
+                }`}
+              >
+                Replace All
+              </button>
+              <button
+                onClick={() => setImportMode('merge')}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  importMode === 'merge'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900/30'
+                }`}
+              >
+                Add to Existing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
         {groups.map((group) => (
@@ -349,6 +468,41 @@ export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
             </div>
           </div>
         )}
+
+        {/* Default Duration Setting */}
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <h3 className="font-medium mb-2 text-sm">Default Session Duration</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Used when no duration column is mapped. Common durations: 30, 45, 60, 90 minutes.
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2">
+              {[30, 45, 50, 60, 90].map((mins) => (
+                <button
+                  key={mins}
+                  onClick={() => setDefaultDuration(mins)}
+                  className={`px-3 py-1.5 rounded text-sm font-medium ${
+                    defaultDuration === mins
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {mins} min
+                </button>
+              ))}
+            </div>
+            <span className="text-gray-400">or</span>
+            <input
+              type="number"
+              min="5"
+              max="480"
+              value={defaultDuration}
+              onChange={(e) => setDefaultDuration(Math.max(5, Math.min(480, parseInt(e.target.value) || 60)))}
+              className="w-20 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+            />
+            <span className="text-sm text-gray-500 dark:text-gray-400">minutes</span>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">

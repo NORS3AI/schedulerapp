@@ -83,6 +83,10 @@ export interface Session {
   originalData?: Record<string, string>;
   // Reference to source presenter row
   sourceRowIndex?: number;
+  // Capacity level indicator
+  capacityLevel?: 'low' | 'medium' | 'high';
+  // Manual capacity override (ignores conflict)
+  capacityOverride?: boolean;
 }
 
 // Rooms are manually entered
@@ -94,11 +98,13 @@ export interface Room {
   order: number; // For drag-drop reordering
 }
 
-// Day configuration with order
+// Day configuration with order and optional per-day time slots
 export interface DayConfig {
   id: string;
   name: string;
   order: number;
+  // Per-day time slots (if not set, uses global timeSlots)
+  timeSlots?: TimeSlot[];
 }
 
 // Time slot configuration
@@ -107,6 +113,8 @@ export interface TimeSlot {
   startTime: string; // "09:00"
   endTime: string; // "10:00"
   label?: string; // Optional display label
+  isBreak?: boolean; // Whether this is a break/lunch slot (not schedulable)
+  breakLabel?: string; // Label for break (e.g., "Lunch", "Break")
 }
 
 // Event configuration
@@ -177,6 +185,8 @@ export interface ColumnMapping {
   availabilityColumns?: string[];
   // Columns to ignore/delete
   ignoredColumns?: string[];
+  // Default session duration (in minutes) when no duration column is mapped
+  defaultDuration?: number;
 }
 
 // Conflict types

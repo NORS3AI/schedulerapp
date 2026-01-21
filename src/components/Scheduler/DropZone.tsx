@@ -1,6 +1,7 @@
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import type { Session } from '../../store/types';
+import type { Session, Conflict } from '../../store/types';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
+import { getSessionConflicts, hasOverriddenCapacity } from '../../utils/conflictDetector';
 
 interface DropZoneProps {
   day: string;
@@ -8,9 +9,10 @@ interface DropZoneProps {
   roomId: string;
   session?: Session;
   hasConflict?: boolean;
+  conflicts?: Conflict[];
 }
 
-export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZoneProps) {
+export function DropZone({ day, timeSlot, roomId, session, hasConflict, conflicts = [] }: DropZoneProps) {
   const { updateSession, eventConfig, setSelectedSessionId } = useSchedulerStore();
 
   const { isOver, setNodeRef: setDropRef } = useDroppable({
@@ -31,8 +33,16 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
 
   const room = eventConfig.rooms.find((r) => r.id === roomId);
 
+  // Check if this session has an overridden capacity warning (approved)
+  const hasCapacityOverride = session ? hasOverriddenCapacity(session, eventConfig.rooms) : false;
+
+  // Get the type of conflict for this session
+  const sessionConflicts = session ? getSessionConflicts(session.id, conflicts) : [];
+  const hasCapacityConflict = sessionConflicts.some((c) => c.type === 'capacity');
+
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     if (session) {
       updateSession(session.id, {
         day: undefined,
@@ -42,8 +52,25 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
     }
   };
 
+  const handleRemovePointerDown = (e: React.PointerEvent) => {
+    // Prevent drag from starting when clicking the remove button
+    e.stopPropagation();
+  };
+
+  const handleApproveCapacity = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (session) {
+      updateSession(session.id, { capacityOverride: true });
+    }
+  };
+
+  const handleApprovePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+  };
+
   const handleSessionClick = (e: React.MouseEvent) => {
-    // Don't open details if we clicked the remove button or are dragging
+    // Don't open details if we clicked a button or are dragging
     if (isDragging) return;
     const target = e.target as HTMLElement;
     if (target.closest('button')) return;
@@ -52,22 +79,29 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
     }
   };
 
+  // Determine styling based on conflict state
+  const getBorderStyle = () => {
+    if (isDragging) return 'opacity-50 border-gray-300 dark:border-gray-600';
+    if (!session) {
+      return isOver
+        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
+        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500';
+    }
+    if (hasConflict) {
+      return 'border-red-400 bg-red-50 dark:bg-red-900/20';
+    }
+    if (hasCapacityOverride) {
+      return 'border-amber-400 bg-amber-50 dark:bg-amber-900/20';
+    }
+    return 'border-green-300 bg-green-50 dark:bg-green-900/20 border-solid';
+  };
+
   return (
     <div
       ref={setDropRef}
       className={`
         min-h-[80px] rounded-lg border-2 border-dashed transition-all
-        ${
-          isDragging
-            ? 'opacity-50'
-            : session
-            ? hasConflict
-              ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
-              : 'border-green-300 bg-green-50 dark:bg-green-900/20 border-solid'
-            : isOver
-            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
-            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-        }
+        ${getBorderStyle()}
       `}
     >
       {session ? (
@@ -87,7 +121,8 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
             </div>
             <button
               onClick={handleRemove}
-              className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 rounded"
+              onPointerDown={handleRemovePointerDown}
+              className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
               title="Unschedule session"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -98,17 +133,37 @@ export function DropZone({ day, timeSlot, roomId, session, hasConflict }: DropZo
           <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <span>{session.duration} min</span>
             {session.expectedAttendees && room && (
-              <span className={session.expectedAttendees > room.capacity ? 'text-red-500' : ''}>
+              <span className={session.expectedAttendees > room.capacity && !session.capacityOverride ? 'text-red-500' : session.expectedAttendees > room.capacity ? 'text-amber-600' : ''}>
                 {session.expectedAttendees}/{room.capacity}
               </span>
             )}
           </div>
           {hasConflict && (
-            <div className="mt-1 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+            <div className="mt-1 flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Conflict
+              </div>
+              {hasCapacityConflict && (
+                <button
+                  onClick={handleApproveCapacity}
+                  onPointerDown={handleApprovePointerDown}
+                  className="px-1.5 py-0.5 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
+                  title="Approve capacity override"
+                >
+                  Approve
+                </button>
+              )}
+            </div>
+          )}
+          {hasCapacityOverride && (
+            <div className="mt-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Conflict
+              Capacity Approved
             </div>
           )}
         </div>

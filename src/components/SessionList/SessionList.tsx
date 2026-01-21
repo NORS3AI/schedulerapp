@@ -1,9 +1,12 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { SessionCard } from './SessionCard';
 import { FilterBar } from './FilterBar';
 import { detectConflicts, hasConflict } from '../../utils/conflictDetector';
+import { autoSchedule } from '../../utils/autoScheduler';
+
+type SortOption = 'default' | 'az' | 'za' | 'class-count' | 'availability';
 
 interface SessionListProps {
   onSearchInputRef?: (ref: HTMLInputElement | null) => void;
@@ -12,16 +15,59 @@ interface SessionListProps {
 export function SessionList({ onSearchInputRef }: SessionListProps) {
   const {
     sessions,
+    setSessions,
     eventConfig,
     searchQuery,
     settings,
     scheduledCollapsed,
     setScheduledCollapsed,
+    unscheduledCollapsed,
+    setUnscheduledCollapsed,
     draggedSessionId,
+    selectionMode,
+    setSelectionMode,
+    selectedSessionIds,
+    selectAllUnscheduled,
+    clearSelection,
   } = useSchedulerStore();
 
+  const [sortOption, setSortOption] = useState<SortOption>('default');
+  const [isAutoScheduling, setIsAutoScheduling] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const prevDraggedRef = useRef<string | null>(null);
+
+  // Handle auto-schedule for selected sessions only
+  const handleAutoScheduleSelected = () => {
+    if (selectedSessionIds.size === 0) return;
+
+    setIsAutoScheduling(true);
+
+    setTimeout(() => {
+      // Get sessions to schedule (only selected unscheduled ones)
+      const sessionsToSchedule = sessions.filter(
+        (s) => selectedSessionIds.has(s.id) && (!s.day || !s.timeSlot || !s.roomId)
+      );
+      const alreadyScheduled = sessions.filter(
+        (s) => !selectedSessionIds.has(s.id) || (s.day && s.timeSlot && s.roomId)
+      );
+
+      // Run auto-schedule on selected sessions
+      const result = autoSchedule(
+        sessionsToSchedule,
+        eventConfig.rooms,
+        eventConfig.days,
+        eventConfig.timeSlots
+      );
+
+      // Merge results back
+      const newSessions = [...alreadyScheduled, ...result.scheduledSessions];
+      setSessions(newSessions);
+
+      setIsAutoScheduling(false);
+      setSelectionMode(false);
+      alert(result.message);
+    }, 100);
+  };
 
   // Drop zone for unscheduling sessions
   const { isOver: isOverUnschedule, setNodeRef: setUnscheduleRef } = useDroppable({
@@ -56,9 +102,47 @@ export function SessionList({ onSearchInputRef }: SessionListProps) {
     );
   }, [sessions, searchQuery]);
 
-  const unscheduledSessions = filteredSessions.filter(
+  const unscheduledSessionsUnsorted = filteredSessions.filter(
     (s) => !s.day || !s.timeSlot || !s.roomId
   );
+
+  // Sort unscheduled sessions based on sort option
+  const unscheduledSessions = useMemo(() => {
+    const sorted = [...unscheduledSessionsUnsorted];
+    switch (sortOption) {
+      case 'az':
+        return sorted.sort((a, b) => a.presenterName.localeCompare(b.presenterName));
+      case 'za':
+        return sorted.sort((a, b) => b.presenterName.localeCompare(a.presenterName));
+      case 'class-count': {
+        // Count sessions per presenter
+        const presenterCounts = new Map<string, number>();
+        sessions.forEach((s) => {
+          const name = s.presenterName;
+          presenterCounts.set(name, (presenterCounts.get(name) || 0) + 1);
+        });
+        // Sort by count (descending), then by name
+        return sorted.sort((a, b) => {
+          const countA = presenterCounts.get(a.presenterName) || 0;
+          const countB = presenterCounts.get(b.presenterName) || 0;
+          if (countB !== countA) return countB - countA;
+          return a.presenterName.localeCompare(b.presenterName);
+        });
+      }
+      case 'availability': {
+        // Sort by availability restrictions (most restricted first)
+        return sorted.sort((a, b) => {
+          const availA = a.unavailability?.length || 0;
+          const availB = b.unavailability?.length || 0;
+          if (availB !== availA) return availB - availA;
+          return a.presenterName.localeCompare(b.presenterName);
+        });
+      }
+      default:
+        return sorted;
+    }
+  }, [unscheduledSessionsUnsorted, sortOption, sessions]);
+
   const scheduledSessions = filteredSessions.filter(
     (s) => s.day && s.timeSlot && s.roomId
   );
@@ -116,19 +200,111 @@ export function SessionList({ onSearchInputRef }: SessionListProps) {
 
             {unscheduledSessions.length > 0 && (
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  Unscheduled ({unscheduledSessions.length})
-                </h3>
-                <div className="space-y-2">
-                  {unscheduledSessions.map((session) => (
-                    <SessionCard
-                      key={session.id}
-                      session={session}
-                      hasConflict={hasConflict(session.id, conflicts)}
-                    />
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={() => setUnscheduledCollapsed(!unscheduledCollapsed)}
+                    className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <svg
+                      className={`w-4 h-4 transition-transform ${unscheduledCollapsed ? '' : 'rotate-90'}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Unscheduled ({unscheduledSessions.length})
+                    {unscheduledCollapsed && (
+                      <span className="text-xs text-gray-400 ml-2">(click to expand)</span>
+                    )}
+                  </button>
+                  {!unscheduledCollapsed && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectionMode(!selectionMode)}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${
+                          selectionMode
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                            : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'
+                        }`}
+                        title={selectionMode ? 'Exit selection mode' : 'Select sessions to auto-schedule'}
+                      >
+                        {selectionMode ? 'Cancel' : 'Select'}
+                      </button>
+                      <select
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value as SortOption)}
+                        className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                      >
+                        <option value="default">Sort: Default</option>
+                        <option value="az">Sort: A-Z</option>
+                        <option value="za">Sort: Z-A</option>
+                        <option value="class-count">Sort: Class Count</option>
+                        <option value="availability">Sort: Availability</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
+
+                {/* Selection mode controls */}
+                {!unscheduledCollapsed && selectionMode && (
+                  <div className="mb-3 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={selectAllUnscheduled}
+                          className="text-xs px-2 py-1 rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={clearSelection}
+                          className="text-xs px-2 py-1 rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+                        >
+                          Clear
+                        </button>
+                        <span className="text-xs text-primary-600 dark:text-primary-400">
+                          {selectedSessionIds.size} selected
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleAutoScheduleSelected}
+                        disabled={selectedSessionIds.size === 0 || isAutoScheduling}
+                        className="text-xs px-3 py-1 rounded bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      >
+                        {isAutoScheduling ? (
+                          <>
+                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Scheduling...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Auto-Schedule Selected
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!unscheduledCollapsed && (
+                  <div className="space-y-2">
+                    {unscheduledSessions.map((session) => (
+                      <SessionCard
+                        key={session.id}
+                        session={session}
+                        hasConflict={hasConflict(session.id, conflicts)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

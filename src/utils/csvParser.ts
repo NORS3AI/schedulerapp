@@ -230,6 +230,9 @@ export function mapDataToSessions(
     const unavailabilityStr = getMappingValue(row, mapping.unavailableTimes);
     const unavailability = parseUnavailability(unavailabilityStr);
 
+    // Default duration from mapping settings, or 50 minutes if not set
+    const defaultDuration = mapping.defaultDuration || 50;
+
     // Base presenter info for all breakouts from this row
     const baseInfo = {
       presenterName,
@@ -242,13 +245,26 @@ export function mapDataToSessions(
       coPresenterName,
       coPresenterFirstName: coFirstName || undefined,
       coPresenterLastName: coLastName || undefined,
+      coPresenterTitle: getMappingValue(row, mapping.coPresenterTitle),
+      coPresenterCompany: getMappingValue(row, mapping.coPresenterCompany),
       coPresenterEmail: getMappingValue(row, mapping.coPresenterEmail),
       coPresenterPhone: getMappingValue(row, mapping.coPresenterPhone),
-      duration: durationStr ? parseInt(durationStr, 10) || 60 : 60,
+      duration: durationStr ? parseInt(durationStr, 10) || defaultDuration : defaultDuration,
       expectedAttendees: attendeesStr ? parseInt(attendeesStr, 10) : undefined,
       unavailability,
+      unavailabilityText: unavailabilityStr,
       originalData: row,
       sourceRowIndex: rowIndex,
+    };
+
+    // Helper to parse mastery level from raw value
+    const parseMasteryLevel = (value: string | undefined): 'beginner' | 'intermediate' | 'advanced' | undefined => {
+      if (!value) return undefined;
+      const lower = value.toLowerCase().trim();
+      if (lower.includes('beginner') || lower.includes('basic') || lower.includes('intro')) return 'beginner';
+      if (lower.includes('intermediate') || lower.includes('medium')) return 'intermediate';
+      if (lower.includes('advanced') || lower.includes('expert')) return 'advanced';
+      return undefined;
     };
 
     // Create session for Breakout 1
@@ -258,6 +274,7 @@ export function mapDataToSessions(
         id: generateId(),
         sessionTitle: breakout1Title,
         description: getMappingValue(row, mapping.breakout1Description),
+        masteryLevel: parseMasteryLevel(getMappingValue(row, mapping.breakout1MasteryLevel)),
         breakoutNumber: 1,
         ...baseInfo,
       });
@@ -270,6 +287,7 @@ export function mapDataToSessions(
         id: generateId(),
         sessionTitle: breakout2Title,
         description: getMappingValue(row, mapping.breakout2Description),
+        masteryLevel: parseMasteryLevel(getMappingValue(row, mapping.breakout2MasteryLevel)),
         breakoutNumber: 2,
         ...baseInfo,
       });
@@ -282,6 +300,7 @@ export function mapDataToSessions(
         id: generateId(),
         sessionTitle: breakout3Title,
         description: getMappingValue(row, mapping.breakout3Description),
+        masteryLevel: parseMasteryLevel(getMappingValue(row, mapping.breakout3MasteryLevel)),
         breakoutNumber: 3,
         ...baseInfo,
       });

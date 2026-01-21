@@ -9,6 +9,14 @@ interface PdfOptions {
   sessions: Session[];
 }
 
+// Format time to 12-hour format
+function formatTime12h(time: string): string {
+  const [hours, mins] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${String(mins).padStart(2, '0')} ${period}`;
+}
+
 export async function exportScheduleToPdf(options: PdfOptions): Promise<void> {
   const { title, days, timeSlots, rooms, sessions } = options;
   const pdf = new jsPDF('landscape', 'mm', 'a4');
@@ -60,43 +68,68 @@ export async function exportScheduleToPdf(options: PdfOptions): Promise<void> {
     let currentY = tableTop + 10;
 
     for (const slot of timeSlots) {
-      const slotLabel = `${slot.startTime} - ${slot.endTime}`;
+      // Check if any session exists in this slot for this day
+      const hasSessionInSlot = sessions.some(
+        (s) => s.day === day && s.timeSlot === slot.startTime
+      );
 
-      // Time cell
-      pdf.setFillColor(243, 244, 246); // gray-100
-      pdf.rect(margin, currentY, timeColWidth, rowHeight, 'FD');
-      pdf.setFontSize(9);
-      pdf.text(slotLabel, margin + 2, currentY + 8);
+      // Skip empty non-break rows
+      if (!hasSessionInSlot && !slot.isBreak) {
+        continue;
+      }
 
-      // Room cells
-      for (let i = 0; i < rooms.length; i++) {
-        const room = rooms[i];
-        const x = margin + timeColWidth + i * roomColWidth;
+      const slotLabel = `${formatTime12h(slot.startTime)} - ${formatTime12h(slot.endTime)}`;
 
-        // Find session in this slot
-        const session = sessions.find(
-          (s) =>
-            s.day === day &&
-            s.timeSlot === slot.startTime &&
-            s.roomId === room.id
-        );
+      // Time cell - use different color for breaks
+      if (slot.isBreak) {
+        pdf.setFillColor(254, 243, 199); // amber-100
+        pdf.rect(margin, currentY, timeColWidth, rowHeight, 'FD');
+        pdf.setFontSize(9);
+        pdf.text(slot.breakLabel || 'Break', margin + 2, currentY + 8);
 
-        if (session) {
-          pdf.setFillColor(220, 252, 231); // green-100
+        // Fill all room cells with break indication
+        for (let i = 0; i < rooms.length; i++) {
+          const x = margin + timeColWidth + i * roomColWidth;
+          pdf.setFillColor(254, 243, 199); // amber-100
           pdf.rect(x, currentY, roomColWidth, rowHeight, 'FD');
-          pdf.setFontSize(8);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(session.sessionTitle, x + 2, currentY + 6, {
-            maxWidth: roomColWidth - 4,
-          });
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(7);
-          pdf.text(session.presenterName, x + 2, currentY + 12, {
-            maxWidth: roomColWidth - 4,
-          });
-        } else {
-          pdf.setFillColor(255, 255, 255);
-          pdf.rect(x, currentY, roomColWidth, rowHeight, 'D');
+        }
+      } else {
+        // Time cell
+        pdf.setFillColor(243, 244, 246); // gray-100
+        pdf.rect(margin, currentY, timeColWidth, rowHeight, 'FD');
+        pdf.setFontSize(9);
+        pdf.text(slotLabel, margin + 2, currentY + 8);
+
+        // Room cells
+        for (let i = 0; i < rooms.length; i++) {
+          const room = rooms[i];
+          const x = margin + timeColWidth + i * roomColWidth;
+
+          // Find session in this slot
+          const session = sessions.find(
+            (s) =>
+              s.day === day &&
+              s.timeSlot === slot.startTime &&
+              s.roomId === room.id
+          );
+
+          if (session) {
+            pdf.setFillColor(220, 252, 231); // green-100
+            pdf.rect(x, currentY, roomColWidth, rowHeight, 'FD');
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(session.sessionTitle, x + 2, currentY + 6, {
+              maxWidth: roomColWidth - 4,
+            });
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(7);
+            pdf.text(session.presenterName, x + 2, currentY + 12, {
+              maxWidth: roomColWidth - 4,
+            });
+          } else {
+            pdf.setFillColor(255, 255, 255);
+            pdf.rect(x, currentY, roomColWidth, rowHeight, 'D');
+          }
         }
       }
 

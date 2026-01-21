@@ -6,6 +6,25 @@
   --font-size-base: 16px;
 }
 
+/* Disable text selection globally - except for input fields and textareas */
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in input fields, textareas, and contenteditable */
+input,
+textarea,
+[contenteditable="true"],
+.allow-select {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
 /* Extended font size classes */
 .font-size-smallest {
   --font-size-base: 12px;
@@ -59,12 +78,17 @@ body {
 
 /* Print styles - always use medium/default size */
 @media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
   :root {
-    --font-size-base: 16px !important;
+    --font-size-base: 12px !important;
   }
 
   body {
-    font-size: 16px !important;
+    font-size: 12px !important;
   }
 
   .no-print {
@@ -73,6 +97,22 @@ body {
 
   .print-only {
     display: block !important;
+  }
+
+  /* Show all days container for print */
+  .print-all-days {
+    display: block !important;
+  }
+
+  /* Day tab sections should be visible and page-break properly */
+  .print-day-section {
+    page-break-inside: avoid;
+    page-break-after: always;
+    margin-bottom: 20px;
+  }
+
+  .print-day-section:last-child {
+    page-break-after: avoid;
   }
 
   body {
@@ -88,7 +128,92 @@ body {
   .font-size-large,
   .font-size-larger,
   .font-size-huge {
-    --font-size-base: 16px !important;
+    --font-size-base: 14px !important;
+  }
+
+  /* Reset dark mode for print - always print light */
+  .dark {
+    color-scheme: light;
+  }
+
+  .dark * {
+    background-color: transparent !important;
+    color: #000 !important;
+  }
+
+  /* Override dark mode backgrounds */
+  .dark .bg-gray-900,
+  .dark .bg-gray-800,
+  .dark .bg-gray-700 {
+    background-color: #fff !important;
+  }
+
+  /* Main layout - full width for schedule */
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Schedule grid print styles */
+  #scheduler-grid {
+    height: auto !important;
+    overflow: visible !important;
+    background-color: #fff !important;
+  }
+
+  /* Ensure cards have visible borders */
+  #scheduler-grid .rounded-lg {
+    border: 1px solid #ccc !important;
+  }
+
+  /* Ensure text is readable */
+  #scheduler-grid .text-gray-400,
+  #scheduler-grid .text-gray-500,
+  #scheduler-grid .text-gray-600 {
+    color: #333 !important;
+  }
+
+  /* Room headers */
+  .bg-primary-600 {
+    background-color: #4f46e5 !important;
+    color: #fff !important;
+  }
+
+  /* Break slots */
+  .bg-amber-100 {
+    background-color: #fef3c7 !important;
+  }
+
+  /* Conflict indicators */
+  .bg-red-50 {
+    background-color: #fef2f2 !important;
+  }
+
+  /* Page breaks */
+  .print-page-break {
+    page-break-before: always;
+  }
+
+  /* Print header styles */
+  .print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #000;
+  }
+
+  .print-header h1 {
+    font-size: 24px !important;
+    font-weight: bold !important;
+    margin: 0 !important;
+    color: #000 !important;
+  }
+
+  .print-header p {
+    font-size: 12px !important;
+    color: #666 !important;
+    margin-top: 5px !important;
   }
 }
 

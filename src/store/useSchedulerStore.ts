@@ -16,6 +16,7 @@ interface SchedulerState {
   setEventName: (name: string) => void;
   setDays: (days: DayConfig[]) => void;
   addDay: (day: DayConfig) => void;
+  updateDay: (id: string, updates: Partial<DayConfig>) => void;
   removeDay: (id: string) => void;
   reorderDays: (days: DayConfig[]) => void;
 
@@ -29,6 +30,7 @@ interface SchedulerState {
   setTimeSlots: (slots: TimeSlot[]) => void;
   addTimeSlot: (slot: TimeSlot) => void;
   removeTimeSlot: (id: string) => void;
+  setDayTimeSlots: (dayId: string, slots: TimeSlot[]) => void;
 
   // Column mapping (for CSV import)
   columnMapping: ColumnMapping;
@@ -57,6 +59,8 @@ interface SchedulerState {
   setSearchQuery: (query: string) => void;
   scheduledCollapsed: boolean;
   setScheduledCollapsed: (collapsed: boolean) => void;
+  unscheduledCollapsed: boolean;
+  setUnscheduledCollapsed: (collapsed: boolean) => void;
 
   // Drag state
   draggedSessionId: string | null;
@@ -65,6 +69,14 @@ interface SchedulerState {
   // Selected session for details popup
   selectedSessionId: string | null;
   setSelectedSessionId: (id: string | null) => void;
+
+  // Session selection for auto-schedule
+  selectionMode: boolean;
+  setSelectionMode: (mode: boolean) => void;
+  selectedSessionIds: Set<string>;
+  toggleSessionSelection: (id: string) => void;
+  selectAllUnscheduled: () => void;
+  clearSelection: () => void;
 
   // Reset
   resetAll: () => void;
@@ -127,6 +139,14 @@ export const useSchedulerStore = create<SchedulerState>()(
           days: [...state.eventConfig.days, day]
         },
       })),
+      updateDay: (id, updates) => set((state) => ({
+        eventConfig: {
+          ...state.eventConfig,
+          days: state.eventConfig.days.map((d) =>
+            d.id === id ? { ...d, ...updates } : d
+          ),
+        },
+      })),
       removeDay: (id) => set((state) => ({
         eventConfig: {
           ...state.eventConfig,
@@ -178,6 +198,14 @@ export const useSchedulerStore = create<SchedulerState>()(
           timeSlots: state.eventConfig.timeSlots.filter((t) => t.id !== id),
         },
       })),
+      setDayTimeSlots: (dayId, slots) => set((state) => ({
+        eventConfig: {
+          ...state.eventConfig,
+          days: state.eventConfig.days.map((d) =>
+            d.id === dayId ? { ...d, timeSlots: slots } : d
+          ),
+        },
+      })),
 
       // Column mapping
       columnMapping: {},
@@ -208,6 +236,8 @@ export const useSchedulerStore = create<SchedulerState>()(
       setSearchQuery: (query) => set({ searchQuery: query }),
       scheduledCollapsed: false,
       setScheduledCollapsed: (collapsed) => set({ scheduledCollapsed: collapsed }),
+      unscheduledCollapsed: false,
+      setUnscheduledCollapsed: (collapsed) => set({ unscheduledCollapsed: collapsed }),
 
       // Drag state
       draggedSessionId: null,
@@ -216,6 +246,27 @@ export const useSchedulerStore = create<SchedulerState>()(
       // Selected session
       selectedSessionId: null,
       setSelectedSessionId: (id) => set({ selectedSessionId: id }),
+
+      // Session selection for auto-schedule
+      selectionMode: false,
+      setSelectionMode: (mode) => set({ selectionMode: mode, selectedSessionIds: mode ? new Set() : new Set() }),
+      selectedSessionIds: new Set(),
+      toggleSessionSelection: (id) => set((state) => {
+        const newSet = new Set(state.selectedSessionIds);
+        if (newSet.has(id)) {
+          newSet.delete(id);
+        } else {
+          newSet.add(id);
+        }
+        return { selectedSessionIds: newSet };
+      }),
+      selectAllUnscheduled: () => set((state) => {
+        const unscheduledIds = state.sessions
+          .filter((s) => !s.day || !s.timeSlot || !s.roomId)
+          .map((s) => s.id);
+        return { selectedSessionIds: new Set(unscheduledIds) };
+      }),
+      clearSelection: () => set({ selectedSessionIds: new Set() }),
 
       // Reset
       resetAll: () => set({
@@ -231,6 +282,9 @@ export const useSchedulerStore = create<SchedulerState>()(
         draggedSessionId: null,
         selectedSessionId: null,
         scheduledCollapsed: false,
+        unscheduledCollapsed: false,
+        selectionMode: false,
+        selectedSessionIds: new Set(),
         lastAutoScheduleState: null,
       }),
 
@@ -257,7 +311,16 @@ export const useSchedulerStore = create<SchedulerState>()(
         setupComplete: state.setupComplete,
         selectedDay: state.selectedDay,
         scheduledCollapsed: state.scheduledCollapsed,
+        unscheduledCollapsed: state.unscheduledCollapsed,
       }),
     }
   )
 );
+
+// Helper function to get time slots for a specific day
+export function getTimeSlotsForDay(dayName: string): TimeSlot[] {
+  const state = useSchedulerStore.getState();
+  const day = state.eventConfig.days.find((d) => d.name === dayName);
+  // Return per-day time slots if defined and non-empty, otherwise fall back to global
+  return (day?.timeSlots && day.timeSlots.length > 0) ? day.timeSlots : state.eventConfig.timeSlots;
+}

@@ -49,21 +49,24 @@ export function SplitPane({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {/* Left pane - hidden when printing */}
       <div
-        className="flex-shrink-0 overflow-hidden"
+        className="flex-shrink-0 overflow-hidden no-print"
         style={{ width: leftWidth }}
       >
         {left}
       </div>
 
+      {/* Divider - hidden when printing */}
       <div
-        className={`w-1 bg-gray-200 dark:bg-gray-700 cursor-col-resize hover:bg-primary-400 dark:hover:bg-primary-600 transition-colors ${
+        className={`w-1 bg-gray-200 dark:bg-gray-700 cursor-col-resize hover:bg-primary-400 dark:hover:bg-primary-600 transition-colors no-print ${
           isDragging ? 'bg-primary-500' : ''
         }`}
         onMouseDown={handleMouseDown}
       />
 
-      <div className="flex-1 overflow-hidden">{right}</div>
+      {/* Right pane - main print area */}
+      <div className="flex-1 overflow-hidden print:overflow-visible">{right}</div>
     </div>
   );
 }

@@ -6,6 +6,51 @@ interface ScheduleSlot {
   roomId: string;
 }
 
+/**
+ * Normalize a time string to 24-hour format for comparison
+ * Handles: "9:00 AM", "09:00", "9:00am", "9:00 AM - 10:00 AM", etc.
+ */
+function normalizeTime(time: string): string {
+  if (!time) return '';
+
+  // If it's a range, take the start time
+  const rangeMatch = time.match(/^([^-]+)(?:\s*-\s*[^-]+)?$/);
+  const timePart = rangeMatch ? rangeMatch[1].trim() : time.trim();
+
+  // Parse 12-hour format
+  const match12 = timePart.match(/^(\d{1,2}):?(\d{2})?\s*(am|pm)?$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2] || '00';
+    const meridiem = match12[3]?.toLowerCase();
+
+    if (meridiem === 'pm' && hours !== 12) {
+      hours += 12;
+    } else if (meridiem === 'am' && hours === 12) {
+      hours = 0;
+    }
+
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  }
+
+  // Already in 24-hour format
+  const match24 = timePart.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    return `${match24[1].padStart(2, '0')}:${match24[2]}`;
+  }
+
+  return time.toLowerCase().replace(/\s/g, '');
+}
+
+/**
+ * Check if two time values match (handles different formats)
+ */
+function timesMatch(time1: string, time2: string): boolean {
+  const norm1 = normalizeTime(time1);
+  const norm2 = normalizeTime(time2);
+  return norm1 === norm2;
+}
+
 export interface AutoScheduleResult {
   scheduledSessions: Session[];
   unscheduledSessions: Session[];
@@ -69,10 +114,16 @@ export function autoSchedule(
     presenterSchedule.get(presenterKey)!.add(timeKey);
   }
 
-  // Generate all available slots
+  // Generate all available slots (excluding break time slots)
   const allSlots: ScheduleSlot[] = [];
   for (const day of sortedDays) {
-    for (const timeSlot of timeSlots) {
+    // Use day-specific time slots if available, otherwise use global
+    const dayTimeSlots = day.timeSlots && day.timeSlots.length > 0 ? day.timeSlots : timeSlots;
+    for (const timeSlot of dayTimeSlots) {
+      // Skip break time slots
+      if (timeSlot.isBreak) {
+        continue;
+      }
       for (const room of sortedRooms) {
         allSlots.push({
           day: day.name,
@@ -122,9 +173,22 @@ export function autoSchedule(
 
       // Check presenter unavailability
       if (session.unavailability && session.unavailability.length > 0) {
-        const isUnavailable = session.unavailability.some(
-          (u) => u.day === slot.day && u.timeSlot === slot.timeSlot
-        );
+        const isUnavailable = session.unavailability.some((u) => {
+          // Check day match (case insensitive, partial match for weekday names)
+          const dayMatch =
+            u.day === slot.day ||
+            u.day.toLowerCase() === slot.day.toLowerCase() ||
+            slot.day.toLowerCase().includes(u.day.toLowerCase()) ||
+            u.day.toLowerCase().includes(slot.day.toLowerCase());
+
+          if (!dayMatch) return false;
+
+          // Check time slot - 'all' or '*' means entire day is unavailable
+          if (u.timeSlot === 'all' || u.timeSlot === '*') return true;
+
+          // Use flexible time matching to handle different formats (12h vs 24h, ranges, etc.)
+          return timesMatch(u.timeSlot, slot.timeSlot);
+        });
         if (isUnavailable) {
           continue;
         }

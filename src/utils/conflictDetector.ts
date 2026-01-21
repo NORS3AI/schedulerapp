@@ -48,9 +48,9 @@ export function detectConflicts(
     }
   }
 
-  // Check capacity warnings
+  // Check capacity warnings (skip if manually overridden)
   for (const session of scheduledSessions) {
-    if (session.expectedAttendees && session.roomId) {
+    if (session.expectedAttendees && session.roomId && !session.capacityOverride) {
       const room = rooms.find((r) => r.id === session.roomId);
       if (room && session.expectedAttendees > room.capacity) {
         conflicts.push({
@@ -117,6 +117,15 @@ export function getConflictType(
     }
   }
   return null;
+}
+
+// Check if a session has an overridden capacity warning (exceeds room capacity but approved)
+export function hasOverriddenCapacity(session: Session, rooms: Room[]): boolean {
+  if (!session.capacityOverride || !session.expectedAttendees || !session.roomId) {
+    return false;
+  }
+  const room = rooms.find((r) => r.id === session.roomId);
+  return room ? session.expectedAttendees > room.capacity : false;
 }
 
 // Check if a presenter can be scheduled at a specific time

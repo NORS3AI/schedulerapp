@@ -11,7 +11,7 @@ interface SessionCardProps {
 }
 
 export function SessionCard({ session, hasConflict, isDragging: isDraggingProp }: SessionCardProps) {
-  const { eventConfig, updateSession, setSelectedSessionId, settings } = useSchedulerStore();
+  const { eventConfig, updateSession, setSelectedSessionId, settings, selectionMode, selectedSessionIds, toggleSessionSelection } = useSchedulerStore();
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: session.id,
@@ -27,7 +27,6 @@ export function SessionCard({ session, hasConflict, isDragging: isDraggingProp }
 
   const isScheduled = session.day && session.timeSlot && session.roomId;
   const room = eventConfig.rooms.find((r) => r.id === session.roomId);
-  const hasUnavailability = session.unavailability && session.unavailability.length > 0;
 
   const handleRemoveFromSchedule = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -39,10 +38,25 @@ export function SessionCard({ session, hasConflict, isDragging: isDraggingProp }
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't open popup if clicking remove button
+    // Don't open popup if clicking remove button or checkbox
     if ((e.target as HTMLElement).closest('button')) return;
+    if ((e.target as HTMLElement).closest('input[type="checkbox"]')) return;
+
+    // In selection mode, toggle selection instead of opening details
+    if (selectionMode && !isScheduled) {
+      toggleSessionSelection(session.id);
+      return;
+    }
+
     setSelectedSessionId(session.id);
   };
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    toggleSessionSelection(session.id);
+  };
+
+  const isSelected = selectedSessionIds.has(session.id);
 
   const actualIsDragging = isDragging || isDraggingProp;
 
@@ -63,9 +77,21 @@ export function SessionCard({ session, hasConflict, isDragging: isDraggingProp }
             : 'session-unscheduled'
         }
         ${hasConflict ? 'session-conflict' : ''}
+        ${selectionMode && !isScheduled && isSelected ? 'ring-2 ring-primary-500 bg-primary-50 dark:bg-primary-900/20' : ''}
       `}
     >
       <div className="flex items-start justify-between gap-2">
+        {/* Selection checkbox for unscheduled sessions in selection mode */}
+        {selectionMode && !isScheduled && (
+          <div className="flex-shrink-0 pt-0.5">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={handleCheckboxChange}
+              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           {/* Breakout Topic / Title - Bold */}
           <h4 className="font-bold text-sm truncate">{session.sessionTitle}</h4>
@@ -73,18 +99,20 @@ export function SessionCard({ session, hasConflict, isDragging: isDraggingProp }
           <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
             {session.presenterName}
           </p>
+          {/* Presenter Title - on its own line */}
+          {session.presenterTitle && (
+            <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
+              {session.presenterTitle}
+            </p>
+          )}
+          {/* Presenter Company - on its own line */}
+          {session.presenterCompany && (
+            <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
+              {session.presenterCompany}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {hasUnavailability && (
-            <span
-              className="w-5 h-5 flex items-center justify-center bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-full"
-              title="Has availability restrictions"
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </span>
-          )}
           {hasConflict && (
             <span className="w-5 h-5 flex items-center justify-center bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,11 +125,16 @@ export function SessionCard({ session, hasConflict, isDragging: isDraggingProp }
 
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>{session.duration} min</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap justify-end">
           {session.masteryLevel && (
-            <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs capitalize">
-              {session.masteryLevel}
-            </span>
+            String(session.masteryLevel).split(',').map((level, idx) => (
+              <span
+                key={idx}
+                className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs capitalize"
+              >
+                {level.trim()}
+              </span>
+            ))
           )}
           {session.breakoutNumber && (
             <span className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-xs">
