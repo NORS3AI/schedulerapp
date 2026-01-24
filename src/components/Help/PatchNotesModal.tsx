@@ -215,12 +215,57 @@ const patchNotes: VersionNotes[] = [
     version: 'v1.0.4',
     date: 'January 2026',
     notes: [
-      'Initial release with core scheduling functionality',
+      'Initial public release with full feature set',
       'CSV/Excel import with column mapping',
       'Drag-and-drop scheduling',
       'Conflict detection',
       'Auto-scheduling',
       'PDF and CSV export',
+    ],
+  },
+  {
+    version: 'v1.0.3',
+    date: 'January 2026',
+    notes: [
+      'Auto-scheduling algorithm implementation',
+      'Conflict detection for presenter and room double-bookings',
+      'Capacity warnings when expected attendees exceed room size',
+      'Visual conflict badges on session cards',
+      'Settings modal with theme toggle',
+    ],
+  },
+  {
+    version: 'v1.0.2',
+    date: 'January 2026',
+    notes: [
+      'Drag-and-drop functionality with dnd-kit',
+      'Move sessions between time slots and rooms',
+      'Session cards show scheduled/unscheduled status',
+      'Drop zones highlight on drag hover',
+      'Undo last action support',
+    ],
+  },
+  {
+    version: 'v1.0.1',
+    date: 'January 2026',
+    notes: [
+      'Session list panel with search and filter',
+      'Scheduler grid with day tabs',
+      'Room columns with time slot rows',
+      'Import wizard with column mapping',
+      'CSV and Excel file parsing',
+    ],
+  },
+  {
+    version: 'v1.0.0',
+    date: 'January 2026',
+    notes: [
+      'Initial project setup with React and TypeScript',
+      'Vite build system configured',
+      'Tailwind CSS styling framework',
+      'Zustand state management',
+      'Basic app layout with header and split pane',
+      'Dark mode support',
     ],
   },
 ];
