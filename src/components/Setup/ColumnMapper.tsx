@@ -98,7 +98,7 @@ const autoIgnorePatterns = [
 ];
 
 export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
-  const { rawCsvData, csvHeaders, columnMapping, setColumnMapping, setSessions, sessions: existingSessions } =
+  const { rawCsvData, csvHeaders, columnMapping, setColumnMapping, setSessions, sessions: existingSessions, reParseAvailability } =
     useSchedulerStore();
 
   const [localMapping, setLocalMapping] = useState<ColumnMapping>(columnMapping);
@@ -272,7 +272,8 @@ export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
   const handleNext = () => {
     const finalMapping = { ...localMapping, ignoredColumns, defaultDuration };
     setColumnMapping(finalMapping);
-    const newSessions = mapDataToSessions(rawCsvData, finalMapping);
+    // V1.1.4b: Pass CSV headers to detect weekday availability columns
+    const newSessions = mapDataToSessions(rawCsvData, finalMapping, csvHeaders);
 
     if (importMode === 'merge' && existingSessions.length > 0) {
       // Merge mode: append new sessions to existing
@@ -281,6 +282,13 @@ export function ColumnMapper({ onNext, onBack }: ColumnMapperProps) {
       // Replace mode: replace all sessions
       setSessions(newSessions);
     }
+
+    // V1.1.4b: Re-parse availability to ensure all weekday columns are read
+    // Small delay to ensure sessions are set first
+    setTimeout(() => {
+      reParseAvailability();
+    }, 100);
+
     onNext();
   };
 

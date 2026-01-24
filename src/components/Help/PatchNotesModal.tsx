@@ -12,6 +12,126 @@ interface VersionNotes {
 
 const patchNotes: VersionNotes[] = [
   {
+    version: 'v1.1.4d',
+    date: 'January 2026',
+    notes: [
+      'Session Details: Clean availability display matches Presenters list format',
+      'Availability: Duplicate days are now consolidated (no repeated day headers)',
+      'Availability: Days sorted in calendar order (Thursday, Friday, Saturday...)',
+      'Availability: Time ranges sorted chronologically within each day',
+      'Availability: Cleaner, more user-friendly display in both views',
+    ],
+  },
+  {
+    version: 'v1.1.4c',
+    date: 'January 2026',
+    notes: [
+      'Availability: Clean display with bold day headers (e.g., "Thursday, August 31")',
+      'Availability: Times listed underneath each day in green with checkmarks',
+      'Availability: Unavailable days shown in orange with "Not available" message',
+      'Availability: Removed confusing "on 3" or "on 10" text display',
+      'Availability: Only green (available) or orange (unavailable) text shown',
+    ],
+  },
+  {
+    version: 'v1.1.4b',
+    date: 'January 2026',
+    notes: [
+      'Availability: Reads ALL weekday columns from spreadsheet (Thursday, Friday, Saturday, etc.)',
+      'Availability: Each presenter\'s specific times parsed from their individual cells',
+      'Availability: Auto-detects columns like "THURSDAY, August 31" pattern',
+      'Availability: Re-parses on app load to capture previously missed weekday data',
+      'Import: Now passes CSV headers to properly detect weekday availability columns',
+    ],
+  },
+  {
+    version: 'v1.1.4a',
+    date: 'January 2026',
+    notes: [
+      'Availability: "I will not be able to teach..." text displays in orange color',
+      'Availability: Time ranges like "2:45PM - 3:35PM" display in green on separate lines',
+      'Availability: Checks ALL days from spreadsheet, not just a single day',
+      'Availability: Local database stores presenter availability for auto-scheduler',
+      'Auto-scheduler: Uses availability database for smarter scheduling based on times and days',
+      'Auto-scheduler: Respects room preferences from availability database',
+    ],
+  },
+  {
+    version: 'v1.1.4',
+    date: 'January 2026',
+    notes: [
+      'Break/Lunch overlap: Auto-removes time slots that overlap by more than 45 minutes when adding breaks',
+      'Settings: Consolidated editing checkmarks into single "Edit All" option',
+      'Auto-scheduler: Sessions that cannot be scheduled remain in the list instead of disappearing',
+      'Auto-scheduler: Message shows count of unscheduled sessions with note to check Conflicts',
+      'Radial menu: Assign button now shows floating Quick Assign menu for Day/Time/Room selection',
+      'Plus/Minus buttons: Now properly clickable instead of triggering drag behavior',
+      'Availability display: Fixed invalid time formats (e.g., "33:00 PM") with proper validation',
+      'Fixed: Auto-schedule no longer removes sessions from the total count',
+    ],
+  },
+  {
+    version: 'v1.1.3',
+    date: 'January 2026',
+    notes: [
+      'Rich text editing: Session Details description supports bold, italic, lists, and links',
+      'Rich text editing: Presenters list breakout descriptions support rich formatting',
+      'Presenters list: Full editing when Edit mode is on (title, description, mastery levels)',
+      'Presenters list: Reorder breakouts with up/down buttons',
+      'Presenters list: Delete individual sessions/breakouts',
+      'Presenters list: Mastery level multi-select (Beginner, Intermediate, Advanced)',
+      'Presenters list: Availability section matches Session Details format with icons',
+      'PDF Export: Skips empty timeslot rows (no sessions scheduled)',
+      'PDF Export: Skips Lunch/breaks if no sessions in that slot',
+      'PDF Export: Skips entire day if nothing scheduled',
+    ],
+  },
+  {
+    version: 'v1.1.2',
+    date: 'January 2026',
+    notes: [
+      'Custom Export: PDF and Print now support custom field selection like CSV',
+      'Select All: When searching, selects only filtered sessions instead of all',
+      'Auto-schedule selected: Day selection dropdown for scheduling selected sessions',
+    ],
+  },
+  {
+    version: 'v1.1.1',
+    date: 'January 2026',
+    notes: [
+      'Session duplication: Plus/minus buttons to create multiple teachings of same session',
+      'Room preference: Option for presenter to stay in one room all day',
+      'Auto-schedule by day: Dropdown to schedule sessions to specific days only',
+      'Auto-scheduler respects room preferences when assigning slots',
+      'Fixed: Radial menu buttons now properly trigger actions',
+      'Fixed: Session Details popup opens correctly from all interactions',
+      'Instance badges show teaching count (e.g., "1/3" for first of three teachings)',
+    ],
+  },
+  {
+    version: 'v1.1.0',
+    date: 'January 2026',
+    notes: [
+      'Availability section: Human-readable display format',
+      'Availability parsing: "I will not be able to teach..." → "Unavailable on Day, Date"',
+      'Availability parsing: Time ranges → "Available on Day from X to Y"',
+      'Visual indicators: Green checkmark for available, red X for unavailable times',
+      'Auto-scheduler: Uses parsed availability data for smarter scheduling',
+      'Structured availability storage for internal reference',
+    ],
+  },
+  {
+    version: 'v1.0.9',
+    date: 'January 2026',
+    notes: [
+      'Fixed: Selection mode now disables drag-and-drop for proper card selection',
+      'Right-click radial menu on cards: Session Details, Assign Room, Unschedule',
+      'Session Details: Presenter fields (Name, Title, Company, Phone, Email) on separate lines',
+      'Session Details: Co-Presenter fields on separate lines with labels',
+      'Improved card interaction: right-click for context menu, click for scheduled cards',
+    ],
+  },
+  {
     version: 'v1.0.8',
     date: 'January 2026',
     notes: [
@@ -107,7 +227,7 @@ const patchNotes: VersionNotes[] = [
 
 export function PatchNotesModal({ onClose }: PatchNotesModalProps) {
   const [expandedVersions, setExpandedVersions] = useState<Record<string, boolean>>({
-    'v1.0.8': true, // Latest version expanded by default
+    'v1.1.4d': true, // Latest version expanded by default
   });
 
   // Handle Escape key

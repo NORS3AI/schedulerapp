@@ -71,23 +71,18 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               <label className="flex items-center gap-3">
                 <input
                   type="checkbox"
-                  checked={settings.allowEditPresenters}
-                  onChange={(e) => updateSettings({ allowEditPresenters: e.target.checked })}
+                  checked={settings.allowEditAll}
+                  onChange={(e) => updateSettings({
+                    allowEditAll: e.target.checked,
+                    allowEditPresenters: e.target.checked,
+                    allowEditSessions: e.target.checked,
+                  })}
                   className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
                 />
-                <span className="text-sm">Allow editing presenters and co-presenters</span>
-              </label>
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={settings.allowEditSessions}
-                  onChange={(e) => updateSettings({ allowEditSessions: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-                />
-                <span className="text-sm">Allow editing sessions</span>
+                <span className="text-sm">Edit All</span>
               </label>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Enable these to edit or delete presenters and sessions in the Presenters modal.
+                Enable to edit presenters, co-presenters, sessions, breakouts, and all card details in the Presenters list.
               </p>
             </div>
           </div>

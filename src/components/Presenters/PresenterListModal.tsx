@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { formatTime } from '../../utils/timeFormatter';
+import { RichTextEditor, RichTextDisplay } from '../Common/RichTextEditor';
+import type { MasteryLevel, AvailabilityDayDisplay } from '../../store/types';
+import type { AvailabilityDisplayItem } from '../../utils/availabilityParser';
 
 interface PresenterListModalProps {
   onClose: () => void;
@@ -38,7 +41,273 @@ interface PresenterSummary {
   }>;
   unavailability: Array<{ day: string; timeSlot: string }>;
   unavailabilityText?: string;
+  parsedAvailability?: { humanReadable?: string[]; displayItems?: AvailabilityDisplayItem[]; dayDisplays?: AvailabilityDayDisplay[] };
   sessionIds: string[];
+}
+
+// Session/Breakout card with editing capabilities
+interface SessionBreakoutCardProps {
+  session: {
+    id: string;
+    sessionTitle: string;
+    breakoutNumber?: 1 | 2 | 3;
+    description?: string;
+    masteryLevel?: string;
+    day?: string;
+    timeSlot?: string;
+    roomName?: string;
+  };
+  sessionIndex: number;
+  totalSessions: number;
+  presenterSessionIds: string[];
+  settings: { allowEditPresenters: boolean; timeFormat: '12h' | '24h' };
+  updateSession: (id: string, updates: Record<string, unknown>) => void;
+  removeSession: (id: string) => void;
+}
+
+function SessionBreakoutCard({
+  session,
+  sessionIndex,
+  totalSessions,
+  presenterSessionIds,
+  settings,
+  updateSession,
+  removeSession,
+}: SessionBreakoutCardProps) {
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState(session.sessionTitle);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editDescription, setEditDescription] = useState(session.description || '');
+
+  const handleMoveUp = () => {
+    if (sessionIndex === 0) return;
+    const currentBreakout = session.breakoutNumber || sessionIndex + 1;
+    const prevSession = presenterSessionIds[sessionIndex - 1];
+    // Swap breakout numbers
+    updateSession(session.id, { breakoutNumber: currentBreakout - 1 });
+    if (prevSession) {
+      updateSession(prevSession, { breakoutNumber: currentBreakout });
+    }
+  };
+
+  const handleMoveDown = () => {
+    if (sessionIndex === totalSessions - 1) return;
+    const currentBreakout = session.breakoutNumber || sessionIndex + 1;
+    const nextSession = presenterSessionIds[sessionIndex + 1];
+    // Swap breakout numbers
+    updateSession(session.id, { breakoutNumber: currentBreakout + 1 });
+    if (nextSession) {
+      updateSession(nextSession, { breakoutNumber: currentBreakout });
+    }
+  };
+
+  const handleDeleteSession = () => {
+    if (confirm(`Delete session "${session.sessionTitle}"?`)) {
+      removeSession(session.id);
+    }
+  };
+
+  const toggleMasteryLevel = (level: 'beginner' | 'intermediate' | 'advanced') => {
+    const currentLevels = session.masteryLevel ? String(session.masteryLevel).split(',').map(l => l.trim()) : [];
+    let newLevels: string[];
+    if (currentLevels.includes(level)) {
+      newLevels = currentLevels.filter(l => l !== level);
+    } else {
+      newLevels = [...currentLevels, level];
+    }
+    const newValue = newLevels.length > 0 ? newLevels.join(', ') : undefined;
+    updateSession(session.id, { masteryLevel: newValue as MasteryLevel | undefined });
+  };
+
+  const currentLevels = session.masteryLevel ? String(session.masteryLevel).split(',').map(l => l.trim()) : [];
+
+  return (
+    <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-200 dark:border-gray-600">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          {/* Session Title */}
+          {isEditingTitle && settings.allowEditPresenters ? (
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm font-medium"
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  updateSession(session.id, { sessionTitle: editTitle });
+                  setIsEditingTitle(false);
+                }}
+                className="px-2 py-1 bg-primary-600 text-white rounded text-xs"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setEditTitle(session.sessionTitle);
+                  setIsEditingTitle(false);
+                }}
+                className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div
+              className={`font-medium ${settings.allowEditPresenters ? 'cursor-pointer hover:text-primary-600' : ''}`}
+              onClick={() => settings.allowEditPresenters && setIsEditingTitle(true)}
+            >
+              {session.breakoutNumber && (
+                <span className="text-primary-600 dark:text-primary-400 mr-2">
+                  Breakout {session.breakoutNumber}:
+                </span>
+              )}
+              {session.sessionTitle}
+              {settings.allowEditPresenters && (
+                <svg className="w-3 h-3 inline ml-1 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              )}
+            </div>
+          )}
+
+          {/* Description with Rich Text */}
+          {isEditingDescription && settings.allowEditPresenters ? (
+            <div className="mt-2">
+              <RichTextEditor
+                value={editDescription}
+                onChange={setEditDescription}
+                placeholder="Add description..."
+                minHeight="60px"
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => {
+                    updateSession(session.id, { description: editDescription || undefined });
+                    setIsEditingDescription(false);
+                  }}
+                  className="px-2 py-1 bg-primary-600 text-white rounded text-xs"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setEditDescription(session.description || '');
+                    setIsEditingDescription(false);
+                  }}
+                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div
+              className={`mt-1 ${settings.allowEditPresenters ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 rounded px-1 -mx-1' : ''}`}
+              onClick={() => settings.allowEditPresenters && setIsEditingDescription(true)}
+            >
+              {session.description ? (
+                <RichTextDisplay html={session.description} className="text-sm text-gray-600 dark:text-gray-400" />
+              ) : settings.allowEditPresenters ? (
+                <span className="text-sm text-gray-400 italic">Click to add description...</span>
+              ) : null}
+            </div>
+          )}
+
+          {/* Mastery Level Multi-Select (editable) */}
+          <div className="flex items-center gap-1 flex-wrap mt-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400">Mastery:</span>
+            {settings.allowEditPresenters ? (
+              <>
+                {(['beginner', 'intermediate', 'advanced'] as const).map((level) => {
+                  const isSelected = currentLevels.includes(level);
+                  return (
+                    <button
+                      key={level}
+                      onClick={() => toggleMasteryLevel(level)}
+                      className={`text-xs px-2 py-0.5 rounded border transition-colors capitalize ${
+                        isSelected
+                          ? level === 'beginner' ? 'bg-green-500 text-white border-green-500' :
+                            level === 'intermediate' ? 'bg-blue-500 text-white border-blue-500' :
+                            'bg-purple-500 text-white border-purple-500'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  );
+                })}
+              </>
+            ) : session.masteryLevel ? (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
+                {session.masteryLevel}
+              </span>
+            ) : (
+              <span className="text-xs text-gray-400">None</span>
+            )}
+          </div>
+        </div>
+
+        {/* Right side: Schedule info and actions */}
+        <div className="flex flex-col items-end gap-2">
+          {session.day && session.timeSlot && (
+            <div className="text-right text-sm">
+              <div className="text-green-600 dark:text-green-400 text-xs">Scheduled</div>
+              <div className="text-gray-500 dark:text-gray-400 text-xs">
+                {session.day} @ {formatTime(session.timeSlot, settings.timeFormat)}
+              </div>
+              {session.roomName && (
+                <div className="text-gray-500 dark:text-gray-400 text-xs">
+                  {session.roomName}
+                </div>
+              )}
+            </div>
+          )}
+
+          {settings.allowEditPresenters && (
+            <div className="flex items-center gap-1">
+              {/* Reorder buttons */}
+              {totalSessions > 1 && (
+                <>
+                  <button
+                    onClick={handleMoveUp}
+                    disabled={sessionIndex === 0}
+                    className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Move up"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleMoveDown}
+                    disabled={sessionIndex === totalSessions - 1}
+                    className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Move down"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </>
+              )}
+              <button
+                onClick={handleDeleteSession}
+                className="p-1 text-red-500 hover:text-red-700"
+                title="Delete session"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function PresenterListModal({ onClose }: PresenterListModalProps) {
@@ -99,6 +368,7 @@ export function PresenterListModal({ onClose }: PresenterListModalProps) {
           sessions: [],
           unavailability: session.unavailability || [],
           unavailabilityText: session.unavailabilityText,
+          parsedAvailability: session.parsedAvailability,
           sessionIds: [],
         });
       }
@@ -598,67 +868,112 @@ export function PresenterListModal({ onClose }: PresenterListModalProps) {
 
                         {/* Sessions/Breakouts */}
                         <div>
-                          <h4 className="font-medium text-sm mb-2">Sessions</h4>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-sm">Sessions/Breakouts</h4>
+                            {settings.allowEditPresenters && presenter.sessions.length > 1 && (
+                              <span className="text-xs text-gray-500">Drag to reorder breakouts</span>
+                            )}
+                          </div>
                           <div className="space-y-2">
-                            {presenter.sessions.map((session) => (
-                              <div
+                            {presenter.sessions
+                              .sort((a, b) => (a.breakoutNumber || 99) - (b.breakoutNumber || 99))
+                              .map((session, sessionIndex) => (
+                              <SessionBreakoutCard
                                 key={session.id}
-                                className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg"
-                              >
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <div className="font-medium">
-                                      {session.breakoutNumber && (
-                                        <span className="text-primary-600 dark:text-primary-400 mr-2">
-                                          Breakout {session.breakoutNumber}:
-                                        </span>
-                                      )}
-                                      {session.sessionTitle}
-                                    </div>
-                                    {session.description && (
-                                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                        {session.description}
-                                      </p>
-                                    )}
-                                    {session.masteryLevel && (
-                                      <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
-                                        {session.masteryLevel}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {session.day && session.timeSlot && (
-                                    <div className="text-right text-sm">
-                                      <div className="text-green-600 dark:text-green-400">Scheduled</div>
-                                      <div className="text-gray-500 dark:text-gray-400">
-                                        {session.day} @ {formatTime(session.timeSlot, settings.timeFormat)}
-                                      </div>
-                                      {session.roomName && (
-                                        <div className="text-gray-500 dark:text-gray-400">
-                                          {session.roomName}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                                session={session}
+                                sessionIndex={sessionIndex}
+                                totalSessions={presenter.sessions.length}
+                                presenterSessionIds={presenter.sessionIds}
+                                settings={settings}
+                                updateSession={updateSession}
+                                removeSession={removeSession}
+                              />
                             ))}
                           </div>
                         </div>
 
-                        {/* Availability */}
-                        {(presenter.unavailability.length > 0 || presenter.unavailabilityText) && (
+                        {/* Availability - V1.1.4c: Clean display with bold day headers */}
+                        {(presenter.parsedAvailability || presenter.unavailability.length > 0 || presenter.unavailabilityText) && (
                           <div>
-                            <h4 className="font-medium text-sm mb-2 text-gray-700 dark:text-gray-300">
+                            <h4 className="font-medium text-sm mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
                               Availability
                             </h4>
-                            {presenter.unavailabilityText && (
-                              <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg mb-2">
-                                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                                  {presenter.unavailabilityText}
-                                </p>
+                            {/* V1.1.4c: Clean display with bold day headers and times underneath */}
+                            {presenter.parsedAvailability?.dayDisplays && presenter.parsedAvailability.dayDisplays.length > 0 ? (
+                              <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                                {presenter.parsedAvailability.dayDisplays.map((dayDisplay, index) => (
+                                  <div key={index}>
+                                    {/* Bold day header */}
+                                    <p className={`font-semibold text-sm ${
+                                      dayDisplay.type === 'unavailable'
+                                        ? 'text-orange-600 dark:text-orange-400'
+                                        : 'text-green-600 dark:text-green-400'
+                                    }`}>
+                                      {dayDisplay.dayName}{dayDisplay.dateInfo ? `, ${dayDisplay.dateInfo}` : ''}
+                                    </p>
+                                    {/* Times underneath or unavailable message */}
+                                    {dayDisplay.type === 'unavailable' ? (
+                                      <p className="text-sm text-orange-500 dark:text-orange-400 ml-4 flex items-center gap-1">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        Not available
+                                      </p>
+                                    ) : dayDisplay.timeRanges.length > 0 ? (
+                                      <div className="ml-4 space-y-0.5">
+                                        {dayDisplay.timeRanges.map((range, rIdx) => (
+                                          <p key={rIdx} className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            {range.startDisplay} - {range.endDisplay}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-green-600 dark:text-green-400 ml-4 flex items-center gap-1">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Available all day
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            )}
-                            {presenter.unavailability.length > 0 && (
+                            ) : presenter.parsedAvailability?.displayItems && presenter.parsedAvailability.displayItems.length > 0 ? (
+                              // Fallback to displayItems if dayDisplays not available
+                              <div className="space-y-1.5 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                                {presenter.parsedAvailability.displayItems
+                                  .filter(item => item.type !== 'neutral') // Only show green or orange items
+                                  .map((item, index) => (
+                                  <p
+                                    key={index}
+                                    className={`text-sm flex items-start gap-2 ${
+                                      item.type === 'unavailable'
+                                        ? 'text-orange-600 dark:text-orange-400'
+                                        : 'text-green-600 dark:text-green-400'
+                                    }`}
+                                  >
+                                    {item.type === 'unavailable' ? (
+                                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    ) : (
+                                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                    <span>{item.text}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+                            {/* Show structured slots as tags (if no parsedAvailability) */}
+                            {!presenter.parsedAvailability && presenter.unavailability.length > 0 && (
                               <div className="mt-2">
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                                   Cannot teach during:
@@ -667,9 +982,9 @@ export function PresenterListModal({ onClose }: PresenterListModalProps) {
                                   {presenter.unavailability.map((slot, idx) => (
                                     <span
                                       key={idx}
-                                      className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs"
+                                      className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-xs"
                                     >
-                                      {slot.day} @ {slot.timeSlot === 'all' ? 'All Day' : formatTime(slot.timeSlot, settings.timeFormat)}
+                                      {slot.day} {slot.timeSlot === '*' || slot.timeSlot === 'all' ? '(all day)' : `@ ${formatTime(slot.timeSlot, settings.timeFormat)}`}
                                     </span>
                                   ))}
                                 </div>

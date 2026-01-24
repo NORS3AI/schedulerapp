@@ -184,6 +184,32 @@ export function TimeSlotSetup({ onComplete, onBack }: TimeSlotSetupProps) {
   const [breakEndTime, setBreakEndTime] = useState('13:00');
   const [breakLabel, setBreakLabel] = useState('Lunch');
 
+  // V1.1.4: Helper to convert time string to minutes
+  const timeToMinutes = (time: string): number => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  // V1.1.4: Check overlap between two time ranges, returns overlap in minutes
+  const getOverlapMinutes = (start1: string, end1: string, start2: string, end2: string): number => {
+    const s1 = timeToMinutes(start1);
+    const e1 = timeToMinutes(end1);
+    const s2 = timeToMinutes(start2);
+    const e2 = timeToMinutes(end2);
+    const overlapStart = Math.max(s1, s2);
+    const overlapEnd = Math.min(e1, e2);
+    return Math.max(0, overlapEnd - overlapStart);
+  };
+
+  // V1.1.4: Remove slots that overlap with break by more than 45 minutes
+  const removeOverlappingSlots = (slots: TimeSlot[], breakStart: string, breakEnd: string): TimeSlot[] => {
+    return slots.filter(slot => {
+      if (slot.isBreak) return true; // Keep existing breaks
+      const overlap = getOverlapMinutes(slot.startTime, slot.endTime, breakStart, breakEnd);
+      return overlap <= 45; // Keep slots with 45 minutes or less overlap
+    });
+  };
+
   const handleAddBreak = () => {
     if (breakStartTime && breakEndTime && breakStartTime < breakEndTime) {
       const newSlot: TimeSlot = {
@@ -193,8 +219,10 @@ export function TimeSlotSetup({ onComplete, onBack }: TimeSlotSetupProps) {
         isBreak: true,
         breakLabel: breakLabel || 'Break',
       };
+      // V1.1.4: Remove slots that overlap by more than 45 minutes
+      const filteredSlots = removeOverlappingSlots(currentTimeSlots, breakStartTime, breakEndTime);
       // Insert in correct position based on start time
-      const newSlots = [...currentTimeSlots, newSlot].sort((a, b) =>
+      const newSlots = [...filteredSlots, newSlot].sort((a, b) =>
         a.startTime.localeCompare(b.startTime)
       );
       handleSetSlots(newSlots);
@@ -215,7 +243,9 @@ export function TimeSlotSetup({ onComplete, onBack }: TimeSlotSetupProps) {
       isBreak: true,
       breakLabel: label,
     };
-    const newSlots = [...currentTimeSlots, newSlot].sort((a, b) =>
+    // V1.1.4: Remove slots that overlap by more than 45 minutes
+    const filteredSlots = removeOverlappingSlots(currentTimeSlots, start, end);
+    const newSlots = [...filteredSlots, newSlot].sort((a, b) =>
       a.startTime.localeCompare(b.startTime)
     );
     handleSetSlots(newSlots);

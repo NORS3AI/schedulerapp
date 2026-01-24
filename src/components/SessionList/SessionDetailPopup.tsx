@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { formatTime } from '../../utils/timeFormatter';
+import { RichTextEditor, RichTextDisplay } from '../Common/RichTextEditor';
 import type { MasteryLevel } from '../../store/types';
 
 type EditingField =
@@ -298,14 +299,49 @@ export function SessionDetailPopup() {
               placeholder="Session Title"
               className="font-bold text-lg block"
             />
-            <div className="mt-1">
-              <EditableText
-                field="description"
-                value={session.description}
-                placeholder="Add description..."
-                className="text-sm text-gray-600 dark:text-gray-400"
-                multiline
-              />
+            <div className="mt-2">
+              {editingField === 'description' ? (
+                <div>
+                  <RichTextEditor
+                    value={session.description || ''}
+                    onChange={(val) => setEditValue(val)}
+                    placeholder="Add description..."
+                    minHeight="80px"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => {
+                        updateSession(session.id, { description: editValue || undefined });
+                        setEditingField(null);
+                      }}
+                      className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingField(null)}
+                      className="px-3 py-1 bg-gray-200 dark:bg-gray-600 rounded text-sm hover:bg-gray-300 dark:hover:bg-gray-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setEditValue(session.description || '');
+                    setEditingField('description');
+                  }}
+                  className="text-left w-full hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 -mx-2 rounded transition-colors"
+                  title="Click to edit (rich text)"
+                >
+                  {session.description ? (
+                    <RichTextDisplay html={session.description} className="text-sm text-gray-600 dark:text-gray-400" />
+                  ) : (
+                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">Add description...</span>
+                  )}
+                </button>
+              )}
             </div>
             {/* Breakout & Mastery Level */}
             <div className="flex flex-wrap gap-2 mt-2">
@@ -362,18 +398,24 @@ export function SessionDetailPopup() {
                 placeholder="Presenter Name"
                 className="font-semibold"
               />
-              <EditableText
-                field="presenterTitle"
-                value={session.presenterTitle}
-                placeholder="Add title..."
-                className="text-sm text-gray-600 dark:text-gray-400"
-              />
-              <EditableText
-                field="presenterCompany"
-                value={session.presenterCompany}
-                placeholder="Add company..."
-                className="text-sm text-gray-600 dark:text-gray-400"
-              />
+              <p className="text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Title: </span>
+                <EditableText
+                  field="presenterTitle"
+                  value={session.presenterTitle}
+                  placeholder="Add title..."
+                  className="text-gray-600 dark:text-gray-400"
+                />
+              </p>
+              <p className="text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Company: </span>
+                <EditableText
+                  field="presenterCompany"
+                  value={session.presenterCompany}
+                  placeholder="Add company..."
+                  className="text-gray-600 dark:text-gray-400"
+                />
+              </p>
               <p className="text-sm">
                 <span className="text-gray-500 dark:text-gray-400">Phone: </span>
                 <EditableText
@@ -407,18 +449,24 @@ export function SessionDetailPopup() {
                 placeholder="Add co-presenter name..."
                 className="font-semibold"
               />
-              <EditableText
-                field="coPresenterTitle"
-                value={session.coPresenterTitle}
-                placeholder="Add title..."
-                className="text-sm text-gray-600 dark:text-gray-400"
-              />
-              <EditableText
-                field="coPresenterCompany"
-                value={session.coPresenterCompany}
-                placeholder="Add company..."
-                className="text-sm text-gray-600 dark:text-gray-400"
-              />
+              <p className="text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Title: </span>
+                <EditableText
+                  field="coPresenterTitle"
+                  value={session.coPresenterTitle}
+                  placeholder="Add title..."
+                  className="text-gray-600 dark:text-gray-400"
+                />
+              </p>
+              <p className="text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Company: </span>
+                <EditableText
+                  field="coPresenterCompany"
+                  value={session.coPresenterCompany}
+                  placeholder="Add company..."
+                  className="text-gray-600 dark:text-gray-400"
+                />
+              </p>
               <p className="text-sm">
                 <span className="text-gray-500 dark:text-gray-400">Phone: </span>
                 <EditableText
@@ -442,8 +490,8 @@ export function SessionDetailPopup() {
             </div>
           </div>
 
-          {/* Availability Info */}
-          {(session.unavailability && session.unavailability.length > 0) || session.unavailabilityText ? (
+          {/* Availability Info - V1.1.4d: Clean display with bold day headers */}
+          {(session.parsedAvailability || session.unavailability?.length || session.unavailabilityText) ? (
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
               <h4 className="font-medium text-sm text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -451,23 +499,62 @@ export function SessionDetailPopup() {
                 </svg>
                 Availability
               </h4>
-              {session.unavailabilityText && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 whitespace-pre-line">
-                  {session.unavailabilityText}
-                </p>
-              )}
-              {session.unavailability && session.unavailability.length > 0 && (
+              {/* V1.1.4d: Clean display with bold day headers and times underneath */}
+              {session.parsedAvailability?.dayDisplays && session.parsedAvailability.dayDisplays.length > 0 ? (
+                <div className="space-y-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3">
+                  {session.parsedAvailability.dayDisplays.map((dayDisplay, index) => (
+                    <div key={index}>
+                      {/* Bold day header */}
+                      <p className={`font-semibold text-sm ${
+                        dayDisplay.type === 'unavailable'
+                          ? 'text-orange-600 dark:text-orange-400'
+                          : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {dayDisplay.dayName}{dayDisplay.dateInfo ? `, ${dayDisplay.dateInfo}` : ''}
+                      </p>
+                      {/* Times underneath or unavailable message */}
+                      {dayDisplay.type === 'unavailable' ? (
+                        <p className="text-sm text-orange-500 dark:text-orange-400 ml-4 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Not available
+                        </p>
+                      ) : dayDisplay.timeRanges.length > 0 ? (
+                        <div className="ml-4 space-y-0.5">
+                          {dayDisplay.timeRanges.map((range, rIdx) => (
+                            <p key={rIdx} className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              {range.startDisplay} - {range.endDisplay}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-green-600 dark:text-green-400 ml-4 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Available all day
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : !session.parsedAvailability && session.unavailability && session.unavailability.length > 0 ? (
+                // Fallback to structured slots as tags
                 <div className="flex flex-wrap gap-2">
                   {session.unavailability.map((slot, index) => (
                     <span
                       key={index}
-                      className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs"
+                      className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-xs"
                     >
-                      {slot.day} @ {slot.timeSlot}
+                      {slot.day} {slot.timeSlot === '*' || slot.timeSlot === 'all' ? '(all day)' : `@ ${slot.timeSlot}`}
                     </span>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
           ) : null}
 
@@ -648,6 +735,36 @@ export function SessionDetailPopup() {
                   High
                 </button>
               </div>
+            </div>
+
+            {/* Room Preference - V1.1.2 */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-500 dark:text-gray-400">Room Preference:</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={session.preferStayInRoom || false}
+                    onChange={(e) => updateSession(session.id, { preferStayInRoom: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Stay in one room</span>
+                </label>
+              </div>
+              {session.preferStayInRoom && (
+                <select
+                  value={session.preferredRoomId || ''}
+                  onChange={(e) => updateSession(session.id, { preferredRoomId: e.target.value || undefined })}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+                >
+                  <option value="">Any room (auto-assign)</option>
+                  {eventConfig.rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} (Capacity: {r.capacity})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>

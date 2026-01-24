@@ -1,4 +1,5 @@
-import type { Session, Room, TimeSlot, DayConfig } from '../store/types';
+import type { Session, Room, TimeSlot, DayConfig, PresenterAvailabilityEntry } from '../store/types';
+import { isPresenterAvailable, isPresenterAvailableFromEntry } from './availabilityParser';
 
 interface ScheduleSlot {
   day: string;
@@ -57,11 +58,13 @@ export interface AutoScheduleResult {
   message: string;
 }
 
+// V1.1.4a: Enhanced auto-schedule that uses availability database
 export function autoSchedule(
   sessions: Session[],
   rooms: Room[],
   days: DayConfig[],
-  timeSlots: TimeSlot[]
+  timeSlots: TimeSlot[],
+  presenterAvailabilityDb?: Record<string, PresenterAvailabilityEntry> // V1.1.4a: Optional availability database
 ): AutoScheduleResult {
   const unscheduledSessions = sessions.filter(
     (s) => !s.day || !s.timeSlot || !s.roomId
@@ -136,6 +139,11 @@ export function autoSchedule(
 
   // Sort sessions by constraints (more constrained first)
   const sortedSessions = [...unscheduledSessions].sort((a, b) => {
+    // Sessions with room preference are more constrained
+    const aRoomPref = a.preferStayInRoom ? 1 : 0;
+    const bRoomPref = b.preferStayInRoom ? 1 : 0;
+    if (aRoomPref !== bRoomPref) return bRoomPref - aRoomPref;
+
     // Sessions with unavailability are more constrained
     const aUnavail = a.unavailability?.length || 0;
     const bUnavail = b.unavailability?.length || 0;
@@ -147,6 +155,17 @@ export function autoSchedule(
     return bCapacity - aCapacity;
   });
 
+  // Build presenter room assignment map (for room preference)
+  const presenterRoomAssignment = new Map<string, string>();
+  for (const session of alreadyScheduled) {
+    if (session.preferStayInRoom && session.roomId) {
+      const presenterKey = session.presenterName.toLowerCase();
+      if (!presenterRoomAssignment.has(presenterKey)) {
+        presenterRoomAssignment.set(presenterKey, session.roomId);
+      }
+    }
+  }
+
   const scheduledResults: Session[] = [...alreadyScheduled];
   const stillUnscheduled: Session[] = [];
 
@@ -154,8 +173,23 @@ export function autoSchedule(
     const presenterKey = session.presenterName.toLowerCase();
     let scheduled = false;
 
+    // Determine preferred room for this session
+    let preferredRoom: string | undefined = session.preferredRoomId;
+    if (session.preferStayInRoom && !preferredRoom && presenterRoomAssignment.has(presenterKey)) {
+      preferredRoom = presenterRoomAssignment.get(presenterKey);
+    }
+
+    // Sort slots to prioritize preferred room
+    const sortedSlots = preferredRoom
+      ? [...allSlots].sort((a, b) => {
+          if (a.roomId === preferredRoom && b.roomId !== preferredRoom) return -1;
+          if (b.roomId === preferredRoom && a.roomId !== preferredRoom) return 1;
+          return 0;
+        })
+      : allSlots;
+
     // Find a valid slot
-    for (const slot of allSlots) {
+    for (const slot of sortedSlots) {
       const slotKey = `${slot.day}-${slot.timeSlot}-${slot.roomId}`;
       const timeKey = `${slot.day}-${slot.timeSlot}`;
 
@@ -171,8 +205,37 @@ export function autoSchedule(
         }
       }
 
-      // Check presenter unavailability
-      if (session.unavailability && session.unavailability.length > 0) {
+      // V1.1.4a: Check presenter availability using database first
+      if (presenterAvailabilityDb) {
+        const dbEntry = presenterAvailabilityDb[presenterKey] || presenterAvailabilityDb[session.presenterName];
+        if (dbEntry) {
+          if (!isPresenterAvailableFromEntry(dbEntry, slot.day, slot.timeSlot)) {
+            continue;
+          }
+          // Also check room preference from database
+          if (dbEntry.preferStayInRoom && dbEntry.preferredRoomId && dbEntry.preferredRoomId !== slot.roomId) {
+            // Skip this slot if it's not the preferred room (but don't block entirely)
+            // Only skip if there might be preferred room slots available
+            const hasPreferredRoomSlot = allSlots.some(s =>
+              s.roomId === dbEntry.preferredRoomId &&
+              !occupied.has(`${s.day}-${s.timeSlot}-${s.roomId}`)
+            );
+            if (hasPreferredRoomSlot) {
+              continue;
+            }
+          }
+        }
+      }
+
+      // Check presenter availability using parsed availability (V1.1.0)
+      // First try the new parsed availability format
+      if (session.parsedAvailability) {
+        if (!isPresenterAvailable(session.parsedAvailability, slot.day, slot.timeSlot)) {
+          continue;
+        }
+      }
+      // Fallback: Check legacy unavailability format
+      else if (session.unavailability && session.unavailability.length > 0) {
         const isUnavailable = session.unavailability.some((u) => {
           // Check day match (case insensitive, partial match for weekday names)
           const dayMatch =
@@ -216,6 +279,11 @@ export function autoSchedule(
         presenterSchedule.set(presenterKey, new Set());
       }
       presenterSchedule.get(presenterKey)!.add(timeKey);
+
+      // Track room assignment for room preference
+      if (session.preferStayInRoom && !presenterRoomAssignment.has(presenterKey)) {
+        presenterRoomAssignment.set(presenterKey, slot.roomId);
+      }
 
       scheduled = true;
       break;

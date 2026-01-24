@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
-import type { Session, ColumnMapping, ColumnMappingValue, UnavailabilitySlot } from '../store/types';
+import type { Session, ColumnMapping, ColumnMappingValue, UnavailabilitySlot, ParsedAvailability } from '../store/types';
+import { parseAvailabilityText, parseAvailabilityEnhanced } from './availabilityParser';
 
 export interface ParseResult {
   data: Record<string, string>[];
@@ -158,6 +159,25 @@ const dayOfWeekMap: Record<string, string> = {
   saturday: 'Saturday', sat: 'Saturday',
 };
 
+/**
+ * V1.1.4b: Detect weekday availability columns in CSV headers
+ * Patterns like: "THURSDAY, August 31 (Select ALL times...)"
+ *               "Friday, September 1"
+ *               "WEDNESDAY, Jan 15"
+ */
+export function detectWeekdayAvailabilityColumns(headers: string[]): string[] {
+  const weekdayColumns: string[] = [];
+  const weekdayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s*(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}/i;
+
+  for (const header of headers) {
+    if (weekdayPattern.test(header)) {
+      weekdayColumns.push(header);
+    }
+  }
+
+  return weekdayColumns;
+}
+
 // Parse unavailability from a string with multiple formats:
 // - "Day 1: 9:00, 10:00; Day 2: 11:00"
 // - "I will not be able to teach Wednesday, Jan 15"
@@ -212,9 +232,13 @@ function parseUnavailability(value: string | undefined): UnavailabilitySlot[] {
 
 export function mapDataToSessions(
   data: Record<string, string>[],
-  mapping: ColumnMapping
+  mapping: ColumnMapping,
+  csvHeaders?: string[] // V1.1.4b: Optional headers to detect weekday columns
 ): Session[] {
   const sessions: Session[] = [];
+
+  // V1.1.4b: Detect weekday availability columns from headers
+  const weekdayColumns = csvHeaders ? detectWeekdayAvailabilityColumns(csvHeaders) : [];
 
   data.forEach((row, rowIndex) => {
     const firstName = getMappingValue(row, mapping.presenterFirstName) || '';
@@ -229,6 +253,31 @@ export function mapDataToSessions(
     const attendeesStr = getMappingValue(row, mapping.expectedAttendees);
     const unavailabilityStr = getMappingValue(row, mapping.unavailableTimes);
     const unavailability = parseUnavailability(unavailabilityStr);
+
+    // V1.1.4b: Collect availability from ALL weekday columns
+    const weekdayAvailabilityData: Record<string, string> = {};
+    for (const colName of weekdayColumns) {
+      const value = row[colName]?.trim();
+      if (value) {
+        weekdayAvailabilityData[colName] = value;
+      }
+    }
+
+    // V1.1.4b: Build combined raw text from unavailability text + weekday data
+    let combinedRawText = unavailabilityStr || '';
+    for (const [colName, value] of Object.entries(weekdayAvailabilityData)) {
+      if (combinedRawText) combinedRawText += '\n';
+      combinedRawText += `${colName}: ${value}`;
+    }
+
+    // V1.1.4b: Use enhanced parser with all weekday columns
+    let parsedAvailability: ParsedAvailability | null = null;
+    if (combinedRawText || Object.keys(weekdayAvailabilityData).length > 0) {
+      parsedAvailability = parseAvailabilityEnhanced(unavailabilityStr, weekdayAvailabilityData);
+    } else if (unavailabilityStr) {
+      // Fallback to original parser
+      parsedAvailability = parseAvailabilityText(unavailabilityStr) as ParsedAvailability | null;
+    }
 
     // Default duration from mapping settings, or 50 minutes if not set
     const defaultDuration = mapping.defaultDuration || 50;
@@ -252,7 +301,8 @@ export function mapDataToSessions(
       duration: durationStr ? parseInt(durationStr, 10) || defaultDuration : defaultDuration,
       expectedAttendees: attendeesStr ? parseInt(attendeesStr, 10) : undefined,
       unavailability,
-      unavailabilityText: unavailabilityStr,
+      unavailabilityText: combinedRawText || unavailabilityStr, // V1.1.4b: Include all weekday data
+      parsedAvailability: parsedAvailability || undefined,
       originalData: row,
       sourceRowIndex: rowIndex,
     };

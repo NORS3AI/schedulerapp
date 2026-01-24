@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Session, Room, TimeSlot, EventConfig, ColumnMapping, AppSettings, SetupStep, DayConfig } from './types';
+import type { Session, Room, TimeSlot, EventConfig, ColumnMapping, AppSettings, SetupStep, DayConfig, PresenterAvailabilityEntry } from './types';
+import { detectWeekdayAvailabilityColumns } from '../utils/csvParser';
+import { parseAvailabilityEnhanced, buildPresenterAvailabilityEntry } from '../utils/availabilityParser';
 
 interface SchedulerState {
   // Sessions
@@ -9,6 +11,8 @@ interface SchedulerState {
   addSession: (session: Session) => void;
   updateSession: (id: string, updates: Partial<Session>) => void;
   removeSession: (id: string) => void;
+  duplicateSession: (id: string) => void;
+  removeDuplicateSession: (id: string) => void;
 
   // Event config
   eventConfig: EventConfig;
@@ -85,6 +89,15 @@ interface SchedulerState {
   // Auto-schedule state for undo
   lastAutoScheduleState: Session[] | null;
   setLastAutoScheduleState: (sessions: Session[] | null) => void;
+
+  // V1.1.4a: Presenter availability database
+  presenterAvailability: Record<string, PresenterAvailabilityEntry>;
+  setPresenterAvailability: (presenterId: string, entry: PresenterAvailabilityEntry) => void;
+  updatePresenterAvailability: (presenterId: string, updates: Partial<PresenterAvailabilityEntry>) => void;
+  clearPresenterAvailability: () => void;
+
+  // V1.1.4b: Re-parse availability for all sessions from their original CSV data
+  reParseAvailability: () => void;
 }
 
 const defaultEventConfig: EventConfig = {
@@ -103,6 +116,7 @@ const defaultSettings: AppSettings = {
   scheduledSessionsCollapsed: false,
   allowEditPresenters: false,
   allowEditSessions: false,
+  allowEditAll: false, // V1.1.4: Combined editing toggle
 };
 
 export const useSchedulerStore = create<SchedulerState>()(
@@ -122,6 +136,47 @@ export const useSchedulerStore = create<SchedulerState>()(
       removeSession: (id) => set((state) => ({
         sessions: state.sessions.filter((s) => s.id !== id),
       })),
+      duplicateSession: (id) => set((state) => {
+        const original = state.sessions.find((s) => s.id === id);
+        if (!original) return state;
+
+        // Count existing instances of this session
+        const originalId = original.originalSessionId || original.id;
+        const existingInstances = state.sessions.filter(
+          (s) => s.id === originalId || s.originalSessionId === originalId
+        );
+        const nextInstanceNumber = existingInstances.length + 1;
+
+        // Create duplicate with new ID
+        const duplicate: Session = {
+          ...original,
+          id: `${originalId}-instance-${nextInstanceNumber}-${Date.now()}`,
+          originalSessionId: originalId,
+          instanceNumber: nextInstanceNumber,
+          // Clear scheduling for the duplicate
+          day: undefined,
+          timeSlot: undefined,
+          roomId: undefined,
+        };
+
+        // Update original to have instanceNumber 1 if not set
+        const updatedSessions = state.sessions.map((s) => {
+          if (s.id === originalId && !s.instanceNumber) {
+            return { ...s, instanceNumber: 1 };
+          }
+          return s;
+        });
+
+        return { sessions: [...updatedSessions, duplicate] };
+      }),
+      removeDuplicateSession: (id) => set((state) => {
+        const session = state.sessions.find((s) => s.id === id);
+        if (!session || !session.originalSessionId) {
+          // Can't remove original session, only duplicates
+          return state;
+        }
+        return { sessions: state.sessions.filter((s) => s.id !== id) };
+      }),
 
       // Event config
       eventConfig: defaultEventConfig,
@@ -301,6 +356,91 @@ export const useSchedulerStore = create<SchedulerState>()(
       // Auto-schedule state
       lastAutoScheduleState: null,
       setLastAutoScheduleState: (sessions) => set({ lastAutoScheduleState: sessions }),
+
+      // V1.1.4a: Presenter availability database
+      presenterAvailability: {},
+      setPresenterAvailability: (presenterId, entry) => set((state) => ({
+        presenterAvailability: {
+          ...state.presenterAvailability,
+          [presenterId]: entry,
+        },
+      })),
+      updatePresenterAvailability: (presenterId, updates) => set((state) => {
+        const existing = state.presenterAvailability[presenterId];
+        if (!existing) return state;
+        return {
+          presenterAvailability: {
+            ...state.presenterAvailability,
+            [presenterId]: { ...existing, ...updates, lastUpdated: Date.now() },
+          },
+        };
+      }),
+      clearPresenterAvailability: () => set({ presenterAvailability: {} }),
+
+      // V1.1.4b: Re-parse availability for all sessions from their original CSV data
+      reParseAvailability: () => set((state) => {
+        // Detect weekday columns from stored CSV headers
+        const weekdayColumns = detectWeekdayAvailabilityColumns(state.csvHeaders);
+
+        // Map to track which presenters we've already processed
+        const processedPresenters = new Set<string>();
+        const newPresenterAvailability: Record<string, PresenterAvailabilityEntry> = {};
+
+        // Re-parse each session
+        const updatedSessions = state.sessions.map((session) => {
+          if (!session.originalData) {
+            return session; // No original data to re-parse
+          }
+
+          // Collect availability from ALL weekday columns
+          const weekdayAvailabilityData: Record<string, string> = {};
+          for (const colName of weekdayColumns) {
+            const value = session.originalData[colName]?.trim();
+            if (value) {
+              weekdayAvailabilityData[colName] = value;
+            }
+          }
+
+          // Get the original unavailability text
+          const unavailabilityStr = session.unavailabilityText || '';
+
+          // Build combined raw text
+          let combinedRawText = unavailabilityStr;
+          for (const [colName, value] of Object.entries(weekdayAvailabilityData)) {
+            if (combinedRawText) combinedRawText += '\n';
+            combinedRawText += `${colName}: ${value}`;
+          }
+
+          // Re-parse with enhanced parser
+          const parsedAvailability = parseAvailabilityEnhanced(unavailabilityStr, weekdayAvailabilityData);
+
+          // Build presenter availability database entry (once per presenter)
+          const presenterKey = session.presenterName.toLowerCase();
+          if (!processedPresenters.has(presenterKey) && parsedAvailability) {
+            processedPresenters.add(presenterKey);
+            const entry = buildPresenterAvailabilityEntry(
+              presenterKey,
+              session.presenterName,
+              parsedAvailability,
+              session.preferredRoomId,
+              session.preferStayInRoom,
+              combinedRawText
+            );
+            newPresenterAvailability[presenterKey] = entry;
+          }
+
+          return {
+            ...session,
+            unavailabilityText: combinedRawText || unavailabilityStr,
+            parsedAvailability: parsedAvailability || session.parsedAvailability,
+          };
+        });
+
+        return {
+          sessions: updatedSessions,
+          presenterAvailability: { ...state.presenterAvailability, ...newPresenterAvailability },
+        };
+      }),
     }),
     {
       name: 'scheduler-2026-storage',
@@ -312,6 +452,7 @@ export const useSchedulerStore = create<SchedulerState>()(
         selectedDay: state.selectedDay,
         scheduledCollapsed: state.scheduledCollapsed,
         unscheduledCollapsed: state.unscheduledCollapsed,
+        presenterAvailability: state.presenterAvailability, // V1.1.4a: Persist availability database
       }),
     }
   )

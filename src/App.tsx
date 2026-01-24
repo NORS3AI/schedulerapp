@@ -21,6 +21,8 @@ function App() {
     setDraggedSessionId,
     updateSession,
     selectedSessionId,
+    csvHeaders,
+    reParseAvailability,
   } = useSchedulerStore();
 
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -42,6 +44,28 @@ function App() {
     onShowHelp: handleShowHelp,
     onShowSearch: handleShowSearch,
   });
+
+  // V1.1.4b: Re-parse availability on load if sessions exist with originalData
+  // This ensures all weekday availability columns are properly parsed
+  useEffect(() => {
+    if (sessions.length > 0 && csvHeaders.length > 0) {
+      // Check if there are weekday columns that might not have been parsed
+      const weekdayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s*(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}/i;
+      const hasWeekdayColumns = csvHeaders.some(h => weekdayPattern.test(h));
+
+      if (hasWeekdayColumns) {
+        // Check if any session might need re-parsing (has originalData but might be missing weekday availability)
+        const needsReparse = sessions.some(s =>
+          s.originalData &&
+          (!s.parsedAvailability?.displayItems || s.parsedAvailability.displayItems.length === 0)
+        );
+
+        if (needsReparse) {
+          reParseAvailability();
+        }
+      }
+    }
+  }, []); // Run once on mount
 
   // Apply theme
   useEffect(() => {

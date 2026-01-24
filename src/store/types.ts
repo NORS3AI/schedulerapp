@@ -38,6 +38,69 @@ export interface UnavailabilitySlot {
   timeSlot: string;
 }
 
+// Time range for availability (when presenter CAN teach)
+export interface AvailabilityTimeRange {
+  start: string; // "09:15" in 24h format
+  end: string; // "10:05" in 24h format
+  startDisplay: string; // "9:15 AM"
+  endDisplay: string; // "10:05 AM"
+}
+
+// Structured availability for a single day
+export interface DayAvailability {
+  day: string; // "Monday", "Tuesday", etc. or "Day 1", "Day 2"
+  dateInfo?: string; // Optional date like "Aug. 31"
+  unavailableAllDay: boolean;
+  availableTimeRanges: AvailabilityTimeRange[];
+  unavailableTimeRanges: AvailabilityTimeRange[];
+}
+
+// V1.1.4a: Display item with color coding for availability
+export interface AvailabilityDisplayItem {
+  text: string;
+  type: 'unavailable' | 'available' | 'neutral';
+  timeRanges?: AvailabilityTimeRange[]; // For available times, store parsed ranges
+}
+
+// V1.1.4c: Structured day display for cleaner availability presentation
+export interface AvailabilityDayDisplay {
+  dayName: string; // e.g., "Thursday"
+  dateInfo?: string; // e.g., "August 31"
+  type: 'available' | 'unavailable';
+  timeRanges: AvailabilityTimeRange[]; // Times available on this day (empty if unavailable all day)
+}
+
+// Full parsed availability structure for human-readable display and auto-scheduling
+export interface ParsedAvailability {
+  days: DayAvailability[];
+  rawText: string;
+  humanReadable: string[]; // Array of formatted strings for display
+  // V1.1.4a: Enhanced display items with color coding
+  displayItems?: AvailabilityDisplayItem[];
+  // V1.1.4c: Structured day display for cleaner presentation
+  dayDisplays?: AvailabilityDayDisplay[];
+}
+
+// V1.1.4a: Presenter availability database entry
+export interface PresenterAvailabilityEntry {
+  presenterId: string;
+  presenterName: string;
+  // Days the presenter is unavailable (all day)
+  unavailableDays: string[];
+  // Days the presenter is available with specific time ranges
+  availableDays: {
+    day: string;
+    timeRanges: AvailabilityTimeRange[];
+  }[];
+  // Room preference (if any)
+  preferredRoomId?: string;
+  preferStayInRoom?: boolean;
+  // Raw text for reference
+  rawAvailabilityText?: string;
+  // Timestamp for when this was last updated
+  lastUpdated: number;
+}
+
 // Legacy Session type - now represents a breakout that can be scheduled
 export interface Session {
   id: string;
@@ -79,6 +142,8 @@ export interface Session {
   unavailability?: UnavailabilitySlot[];
   // Raw unavailability text for display
   unavailabilityText?: string;
+  // Parsed availability with human-readable format (V1.1.0)
+  parsedAvailability?: ParsedAvailability;
   // Original CSV data for preservation
   originalData?: Record<string, string>;
   // Reference to source presenter row
@@ -87,6 +152,12 @@ export interface Session {
   capacityLevel?: 'low' | 'medium' | 'high';
   // Manual capacity override (ignores conflict)
   capacityOverride?: boolean;
+  // V1.1.2: Number of times this session should be taught (for duplicates)
+  instanceNumber?: number; // 1, 2, 3, etc. for duplicate sessions
+  originalSessionId?: string; // Reference to the original session if this is a duplicate
+  // V1.1.2: Presenter room preference - stay in one room all day
+  preferredRoomId?: string;
+  preferStayInRoom?: boolean; // If true, auto-scheduler will try to keep presenter in same room
 }
 
 // Rooms are manually entered
@@ -215,6 +286,7 @@ export interface AppSettings {
   scheduledSessionsCollapsed: boolean;
   allowEditPresenters: boolean;
   allowEditSessions: boolean;
+  allowEditAll: boolean; // V1.1.4: Combined editing toggle
 }
 
 // Setup wizard state

@@ -40,7 +40,7 @@ export function AboutModal({ onClose }: AboutModalProps) {
               </svg>
             </div>
             <h3 className="text-xl font-bold mb-2">Conference Scheduler</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">Version 1.0.8</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">Version 1.1.4d</p>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
               A visual drag-and-drop scheduling tool for conferences, training events, and workshops.
             </p>

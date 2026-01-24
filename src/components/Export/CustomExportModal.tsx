@@ -216,74 +216,52 @@ export function CustomExportModal({ isOpen, onClose, onExport }: CustomExportMod
 
         {/* Instructions */}
         <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 text-sm text-gray-600 dark:text-gray-400">
-          {exportType === 'csv' ? (
-            'Select fields to export and drag to reorder columns.'
-          ) : (
-            <span className="text-amber-600 dark:text-amber-400">
-              PDF and Print export the schedule grid layout. Use CSV for custom field selection.
-            </span>
-          )}
+          Select fields to export and drag to reorder columns.
         </div>
 
-        {/* Quick actions - only show for CSV */}
-        {exportType === 'csv' && (
-          <div className="px-4 py-2 flex gap-2 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={handleSelectAll}
-              className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-            >
-              Select All
-            </button>
-            <button
-              onClick={handleSelectNone}
-              className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-            >
-              Select None
-            </button>
-            <span className="ml-auto text-xs text-gray-500">
-              {selectedIds.size} of {ALL_EXPORT_FIELDS.length} selected
-            </span>
-          </div>
-        )}
+        {/* Quick actions */}
+        <div className="px-4 py-2 flex gap-2 border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={handleSelectAll}
+            className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+          >
+            Select All
+          </button>
+          <button
+            onClick={handleSelectNone}
+            className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+          >
+            Select None
+          </button>
+          <span className="ml-auto text-xs text-gray-500">
+            {selectedIds.size} of {ALL_EXPORT_FIELDS.length} selected
+          </span>
+        </div>
 
-        {/* Field list - only show for CSV */}
-        {exportType === 'csv' ? (
-          <div className="flex-1 overflow-y-auto p-4">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
+        {/* Field list */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={orderedFields.map((f) => f.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <SortableContext
-                items={orderedFields.map((f) => f.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-1">
-                  {orderedFields.map((field) => (
-                    <SortableFieldItem
-                      key={field.id}
-                      field={field}
-                      isSelected={selectedIds.has(field.id)}
-                      onToggle={handleToggle}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center p-8 text-center text-gray-500 dark:text-gray-400">
-            <div>
-              <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <p className="font-medium mb-2">Schedule Grid Export</p>
-              <p className="text-sm">
-                {exportType === 'pdf' ? 'PDF' : 'Print'} exports the schedule grid layout showing all days, time slots, and rooms.
-              </p>
-            </div>
-          </div>
-        )}
+              <div className="space-y-1">
+                {orderedFields.map((field) => (
+                  <SortableFieldItem
+                    key={field.id}
+                    field={field}
+                    isSelected={selectedIds.has(field.id)}
+                    onToggle={handleToggle}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </div>
 
         {/* Export Type Selection */}
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
