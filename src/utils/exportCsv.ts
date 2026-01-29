@@ -112,10 +112,19 @@ export function exportCustomCsv(
 }
 
 function escapeCSV(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  // Protect against CSV formula injection - prefix dangerous characters with single quote
+  // These characters can trigger formula execution in Excel/Google Sheets
+  const dangerousChars = ['=', '+', '-', '@', '\t', '\r'];
+  let escapedValue = value;
+
+  if (dangerousChars.some(char => value.startsWith(char))) {
+    escapedValue = "'" + value;
   }
-  return value;
+
+  if (escapedValue.includes(',') || escapedValue.includes('"') || escapedValue.includes('\n')) {
+    return `"${escapedValue.replace(/"/g, '""')}"`;
+  }
+  return escapedValue;
 }
 
 export function downloadCSV(content: string, filename: string): void {

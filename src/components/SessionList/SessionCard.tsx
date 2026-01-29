@@ -449,9 +449,9 @@ export function SessionCard({ session, hasConflict, isDragging: isDraggingProp }
         </div>
         <div className="flex items-center gap-1 flex-wrap justify-end">
           {session.masteryLevel && (
-            String(session.masteryLevel).split(',').map((level, idx) => (
+            String(session.masteryLevel).split(',').map((level) => (
               <span
-                key={idx}
+                key={`${session.id}-${level.trim()}`}
                 className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs capitalize"
               >
                 {level.trim()}

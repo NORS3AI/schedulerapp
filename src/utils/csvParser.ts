@@ -193,8 +193,13 @@ function parseUnavailability(value: string | undefined): UnavailabilitySlot[] {
   const teachPattern = /i will not be able to teach\s+(\w+),?\s*(\w+)\.?\s*(\d+)/gi;
   let teachMatch;
   while ((teachMatch = teachPattern.exec(value)) !== null) {
-    const weekday = teachMatch[1].toLowerCase();
-    const monthStr = teachMatch[2].toLowerCase();
+    // Safely access regex groups with null checks
+    const weekdayRaw = teachMatch[1];
+    const monthStrRaw = teachMatch[2];
+    if (!weekdayRaw || !monthStrRaw) continue;
+
+    const weekday = weekdayRaw.toLowerCase();
+    const monthStr = monthStrRaw.toLowerCase();
     // dayNum (teachMatch[3]) is captured but not used - we only need the weekday for scheduling
 
     // Try to parse as weekday + month day

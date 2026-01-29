@@ -655,8 +655,17 @@ export function parseAvailabilityEnhanced(
       // Merge time ranges, avoid duplicates
       if (!day.unavailableAllDay && day.availableTimeRanges.length > 0) {
         for (const range of day.availableTimeRanges) {
+          // Normalize time comparison to handle "9:00" vs "09:00" differences
+          const normalizeTime = (t: string) => {
+            const parts = t.split(':');
+            if (parts.length === 2) {
+              return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+            }
+            return t;
+          };
           const isDuplicate = existing.timeRanges.some(
-            r => r.start === range.start && r.end === range.end
+            r => normalizeTime(r.start) === normalizeTime(range.start) &&
+                 normalizeTime(r.end) === normalizeTime(range.end)
           );
           if (!isDuplicate) {
             existing.timeRanges.push({

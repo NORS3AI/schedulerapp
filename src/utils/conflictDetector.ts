@@ -12,7 +12,9 @@ export function detectConflicts(
   // Check presenter conflicts (same presenter in two places at same time)
   const presenterTimeMap = new Map<string, Session[]>();
   for (const session of scheduledSessions) {
-    const key = `${session.presenterName.toLowerCase()}-${session.day}-${session.timeSlot}`;
+    // Normalize presenter name: trim whitespace and lowercase for consistent matching
+    const normalizedName = session.presenterName.trim().toLowerCase();
+    const key = `${normalizedName}-${session.day}-${session.timeSlot}`;
     const existing = presenterTimeMap.get(key) || [];
     existing.push(session);
     presenterTimeMap.set(key, existing);
@@ -167,7 +169,7 @@ export function isPresenterAvailable(
   const otherSessionAtSameTime = allSessions.find(
     (s) =>
       s.id !== session.id &&
-      s.presenterName.toLowerCase() === session.presenterName.toLowerCase() &&
+      s.presenterName.trim().toLowerCase() === session.presenterName.trim().toLowerCase() &&
       s.day === day &&
       s.timeSlot === timeSlot
   );

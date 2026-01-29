@@ -34,6 +34,7 @@ export function SessionList({ onSearchInputRef }: SessionListProps) {
   const [sortOption, setSortOption] = useState<SortOption>('default');
   const [isAutoScheduling, setIsAutoScheduling] = useState(false);
   const [showDayMenu, setShowDayMenu] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const prevDraggedRef = useRef<string | null>(null);
   const dayMenuRef = useRef<HTMLDivElement>(null);
@@ -86,7 +87,13 @@ export function SessionList({ onSearchInputRef }: SessionListProps) {
 
       setIsAutoScheduling(false);
       setSelectionMode(false);
-      alert(result.message);
+      // Show notification instead of blocking alert
+      setNotification({
+        message: result.message,
+        type: result.scheduledSessions.length > 0 ? 'success' : 'error'
+      });
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => setNotification(null), 5000);
     }, 100);
   };
 
@@ -188,6 +195,27 @@ export function SessionList({ onSearchInputRef }: SessionListProps) {
         <h2 className="text-lg font-semibold mb-3">Sessions</h2>
         <FilterBar onInputRef={onSearchInputRef} />
       </div>
+
+      {/* Notification banner */}
+      {notification && (
+        <div
+          className={`mx-4 mt-2 p-3 rounded-lg flex items-center justify-between text-sm ${
+            notification.type === 'success'
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+              : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200'
+          }`}
+        >
+          <span>{notification.message}</span>
+          <button
+            onClick={() => setNotification(null)}
+            className="ml-2 p-1 hover:bg-black/10 rounded"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       <div ref={listRef} className="flex-1 overflow-y-auto p-4">
         {sessions.length === 0 ? (

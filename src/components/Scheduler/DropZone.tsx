@@ -15,9 +15,15 @@ interface DropZoneProps {
 export function DropZone({ day, timeSlot, roomId, session, hasConflict, conflicts = [] }: DropZoneProps) {
   const { updateSession, eventConfig, setSelectedSessionId } = useSchedulerStore();
 
+  // Validate props to prevent duplicate dropzone IDs from undefined values
+  const validId = day && timeSlot && roomId
+    ? `${day}-${timeSlot}-${roomId}`
+    : `invalid-dropzone-${Math.random().toString(36).substr(2, 9)}`;
+
   const { isOver, setNodeRef: setDropRef } = useDroppable({
-    id: `${day}-${timeSlot}-${roomId}`,
+    id: validId,
     data: { day, timeSlot, roomId },
+    disabled: !day || !timeSlot || !roomId, // Disable dropzone if props are invalid
   });
 
   // Make scheduled sessions draggable

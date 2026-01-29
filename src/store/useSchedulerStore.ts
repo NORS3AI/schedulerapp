@@ -304,7 +304,11 @@ export const useSchedulerStore = create<SchedulerState>()(
 
       // Session selection for auto-schedule
       selectionMode: false,
-      setSelectionMode: (mode) => set({ selectionMode: mode, selectedSessionIds: mode ? new Set() : new Set() }),
+      setSelectionMode: (mode) => set((state) => ({
+        selectionMode: mode,
+        // Only clear selections when turning mode OFF, preserve when turning ON
+        selectedSessionIds: mode ? state.selectedSessionIds : new Set()
+      })),
       selectedSessionIds: new Set(),
       toggleSessionSelection: (id) => set((state) => {
         const newSet = new Set(state.selectedSessionIds);
