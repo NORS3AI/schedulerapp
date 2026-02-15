@@ -26,32 +26,30 @@ export function parseCSV(file: File): Promise<ParseResult> {
   });
 }
 
-export function parseExcel(file: File): Promise<ParseResult> {
-  return new Promise(async (resolve) => {
-    try {
-      const XLSX = await import('xlsx');
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
-        defval: '',
-      });
+export async function parseExcel(file: File): Promise<ParseResult> {
+  try {
+    const XLSX = await import('xlsx');
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
+      defval: '',
+    });
 
-      if (jsonData.length > 0) {
-        const headers = Object.keys(jsonData[0]);
-        resolve({ data: jsonData, headers, errors: [] });
-      } else {
-        resolve({ data: [], headers: [], errors: ['Empty spreadsheet'] });
-      }
-    } catch (error) {
-      resolve({
-        data: [],
-        headers: [],
-        errors: [error instanceof Error ? error.message : 'Failed to parse Excel file'],
-      });
+    if (jsonData.length > 0) {
+      const headers = Object.keys(jsonData[0]);
+      return { data: jsonData, headers, errors: [] };
+    } else {
+      return { data: [], headers: [], errors: ['Empty spreadsheet'] };
     }
-  });
+  } catch (error) {
+    return {
+      data: [],
+      headers: [],
+      errors: [error instanceof Error ? error.message : 'Failed to parse Excel file'],
+    };
+  }
 }
 
 export function parseFile(file: File): Promise<ParseResult> {

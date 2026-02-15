@@ -65,7 +65,7 @@ function App() {
         }
       }
     }
-  }, []); // Run once on mount
+  }, [sessions, csvHeaders, reParseAvailability]); // Re-run when sessions or headers change
 
   // Apply theme
   useEffect(() => {

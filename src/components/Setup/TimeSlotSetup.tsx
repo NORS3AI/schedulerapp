@@ -131,13 +131,13 @@ export function TimeSlotSetup({ onComplete, onBack }: TimeSlotSetupProps) {
     }
   }, [mode, selectedDayId, eventConfig.timeSlots, eventConfig.days]);
 
-  const handleSetSlots = (slots: TimeSlot[]) => {
+  const handleSetSlots = useCallback((slots: TimeSlot[]) => {
     if (mode === 'same') {
       setTimeSlots(slots);
     } else {
       setDayTimeSlots(selectedDayId, slots);
     }
-  };
+  }, [mode, selectedDayId, setTimeSlots, setDayTimeSlots]);
 
   const handleAddSlot = () => {
     if (startTime && endTime && startTime < endTime) {
@@ -231,7 +231,7 @@ export function TimeSlotSetup({ onComplete, onBack }: TimeSlotSetupProps) {
 
   const handleQuickAddBreak = (label: string, duration: number) => {
     // Find a gap in the schedule or add at noon
-    let start = '12:00';
+    const start = '12:00';
     const [h, m] = start.split(':').map(Number);
     const endMins = h * 60 + m + duration;
     const end = `${String(Math.floor(endMins / 60)).padStart(2, '0')}:${String(endMins % 60).padStart(2, '0')}`;
