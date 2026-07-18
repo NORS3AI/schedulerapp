@@ -7,7 +7,8 @@ import { detectConflicts } from '../../utils/conflictDetector';
 import { SettingsModal } from '../Settings/SettingsModal';
 import { HelpMenu } from '../Help/HelpMenu';
 import { ExportMenu } from '../Export/ExportMenu';
-import { CustomExportModal, type ExportField, type ExportType } from '../Export/CustomExportModal';
+import { CustomExportModal, type ExportType } from '../Export/CustomExportModal';
+import type { ExportField } from '../Export/exportFields';
 import { PresenterListModal } from '../Presenters/PresenterListModal';
 import { ConflictsModal } from '../Conflicts/ConflictsModal';
 

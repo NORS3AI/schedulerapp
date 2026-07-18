@@ -1,5 +1,5 @@
 import type { Session, Room } from '../store/types';
-import type { ExportField } from '../components/Export/CustomExportModal';
+import type { ExportField } from '../components/Export/exportFields';
 
 // Get field value from session
 function getFieldValue(session: Session, key: string, rooms: Room[]): string {
@@ -8,9 +8,10 @@ function getFieldValue(session: Session, key: string, rooms: Room[]): string {
       return session.day || '';
     case 'timeSlot':
       return session.timeSlot || '';
-    case 'room':
+    case 'room': {
       const room = rooms.find((r) => r.id === session.roomId);
       return room?.name || '';
+    }
     case 'sessionTitle':
       return session.sessionTitle;
     case 'description':

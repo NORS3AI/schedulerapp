@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import type { Session, Room, TimeSlot } from '../store/types';
-import type { ExportField } from '../components/Export/CustomExportModal';
+import type { ExportField } from '../components/Export/exportFields';
 
 interface PdfOptions {
   title: string;

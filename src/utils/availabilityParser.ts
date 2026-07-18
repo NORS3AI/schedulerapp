@@ -87,7 +87,7 @@ function parseTime(timeStr: string): { time24: string; display: string } | null 
   // Pattern: "9:15a", "9:15p", "9:15am", "9:15pm", "9:15 am", "9:15 pm"
   const match = cleaned.match(/^(\d{1,2}):?(\d{2})?\s*([ap])m?$/i);
   if (match) {
-    let hours = parseInt(match[1], 10);
+    const hours = parseInt(match[1], 10);
     const mins = match[2] ? parseInt(match[2], 10) : 0;
     const isPM = match[3].toLowerCase() === 'p';
 
@@ -490,8 +490,8 @@ export function parseAvailabilityEnhanced(
         const dayMatch = trimmedLine.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i);
         const dateMatch = trimmedLine.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[.\s]*(\d{1,2})\b/i);
 
-        let dayName = dayMatch ? normalizeDay(dayMatch[1]) : undefined;
-        let dateInfo = dateMatch ? `${formatMonth(dateMatch[1])}. ${dateMatch[2]}` : undefined;
+        const dayName = dayMatch ? normalizeDay(dayMatch[1]) : undefined;
+        const dateInfo = dateMatch ? `${formatMonth(dateMatch[1])}. ${dateMatch[2]}` : undefined;
 
         if (dayName) {
           days.push({
