@@ -58,13 +58,13 @@ function App() {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8, // 8px movement required before drag starts
+        distance: 5, // 5px movement required before drag starts
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200, // 200ms press before drag starts (prevents scroll interference)
-        tolerance: 8, // 8px movement tolerance
+        delay: 150, // 150ms press before drag starts (prevents scroll interference)
+        tolerance: 5, // 5px movement tolerance
       },
     })
   );
@@ -168,9 +168,22 @@ function App() {
           />
         </main>
 
-        <DragOverlay>
+        <DragOverlay
+          adjustScale={false}
+          dropAnimation={{
+            duration: 200,
+            easing: 'ease',
+          }}
+        >
           {draggedSession && (
-            <SessionCard session={draggedSession} isDragging />
+            <div style={{
+              width: '280px',
+              touchAction: 'none',
+              transform: 'translate(-50%, -50%)',
+              cursor: 'grabbing',
+            }}>
+              <SessionCard session={draggedSession} isDragging />
+            </div>
           )}
         </DragOverlay>
 
