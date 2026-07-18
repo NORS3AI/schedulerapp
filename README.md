@@ -1,6 +1,6 @@
 # Conference Scheduler 2026
 
-**[🚀 Live Demo](https://nors3ai.github.io/schedulerapp/)**
+**[🚀 Live Demo](https://NORS3AI.github.io/schedulerapp/)**
 
 A powerful React/TypeScript web application for scheduling conference sessions. Import your presenters and sessions, then use drag-and-drop to visually arrange them across days, time slots, and rooms.
 
