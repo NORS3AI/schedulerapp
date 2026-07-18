@@ -6,7 +6,16 @@ import { WelcomeModal } from './components/Setup/WelcomeModal';
 import { SessionList } from './components/SessionList/SessionList';
 import { SessionDetailPopup } from './components/SessionList/SessionDetailPopup';
 import { SchedulerGrid } from './components/Scheduler/SchedulerGrid';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  TouchSensor,
+  MouseSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
 import { SessionCard } from './components/SessionList/SessionCard';
 import { ShortcutsModal } from './components/Help/ShortcutsModal';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -44,6 +53,21 @@ function App() {
     onShowHelp: handleShowHelp,
     onShowSearch: handleShowSearch,
   });
+
+  // Configure sensors for touch and mouse support (iPad, desktop)
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required before drag starts
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200, // 200ms press before drag starts (prevents scroll interference)
+        tolerance: 8, // 8px movement tolerance
+      },
+    })
+  );
 
   // V1.1.4b: Re-parse availability on load if sessions exist with originalData
   // This ensures all weekday availability columns are properly parsed
@@ -125,7 +149,7 @@ function App() {
     : null;
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
         {!setupComplete && <WelcomeModal />}
 
